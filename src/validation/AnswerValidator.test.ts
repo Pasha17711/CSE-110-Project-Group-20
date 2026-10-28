@@ -9,10 +9,15 @@ describe("AnswerValidator", () => {
 
         const score = {
             answerIncorrect: vi.fn(),
-            roomSolved: vi.fn().mockReturnValue(100)
+            roomSolved: vi.
+            fn().mockReturnValue(100)
         }
 
-        const validator = new AnswerValidator(history, score);
+        const notifications = {
+            send: vi.fn()
+        };
+
+        const validator = new AnswerValidator(history, score, notifications);
 
         const result = validator.validateAnswer(
             "5 + 3 = ?",
@@ -24,6 +29,11 @@ describe("AnswerValidator", () => {
         expect(result).toBe(true);
         expect(score.roomSolved).toHaveBeenCalledOnce();
         expect(score.answerIncorrect).not.toHaveBeenCalled();
+
+        expect(notifications.send).toHaveBeenCalledOnce();
+        expect(notifications.send).toHaveBeenCalledWith({
+        eventType: 0
+    });
     });
 
     //Test 2: checks if incorrect answer returns false
@@ -34,7 +44,11 @@ describe("AnswerValidator", () => {
             roomSolved: vi.fn().mockReturnValue(100)
         }
 
-        const validator = new AnswerValidator(history, score);
+        const notifications = {
+            send: vi.fn()
+        };
+
+        const validator = new AnswerValidator(history, score, notifications);
 
         const result = validator.validateAnswer(
             "5 + 3 = ?",
@@ -46,6 +60,12 @@ describe("AnswerValidator", () => {
         expect(result).toBe(false);
         expect(score.roomSolved).not.toHaveBeenCalled();
         expect(score.answerIncorrect).toHaveBeenCalledOnce();
+
+        expect(notifications.send).toHaveBeenCalledOnce();
+        expect(notifications.send).toHaveBeenCalledWith({
+        eventType: 1
+    });
+        
     });
 
     //Test 3: checks that answers should ignore whitespace
@@ -56,7 +76,12 @@ describe("AnswerValidator", () => {
             roomSolved: vi.fn().mockReturnValue(100)
         }
 
-        const validator = new AnswerValidator(history, score);
+        const notifications = {
+            send: vi.fn()
+        };
+
+        const validator = new AnswerValidator(history, score, notifications);
+
         const result = validator.validateAnswer(
             "5 + 3 = ?",
             " 8 ",
@@ -77,7 +102,12 @@ describe("AnswerValidator", () => {
             roomSolved: vi.fn().mockReturnValue(100)
         }
 
-        const validator = new AnswerValidator(history, score);
+        const notifications = {
+            send: vi.fn()
+        };
+
+        const validator = new AnswerValidator(history, score, notifications);
+
         validator.validateAnswer("5 + 3 = ?", "8", "8", true);
 
         expect(history.getResults()).toEqual([
@@ -99,8 +129,13 @@ describe("AnswerValidator", () => {
             answerIncorrect: vi.fn(),
             roomSolved: vi.fn().mockReturnValue(100)
         }
+        
+        const notifications = {
+            send: vi.fn()
+        };
 
-        const validator = new AnswerValidator(history, score);
+        const validator = new AnswerValidator(history, score, notifications);
+
         validator.validateAnswer("5 + 3 = ?", "6", "8", true);
 
         expect(history.getResults()).toEqual([
@@ -113,15 +148,20 @@ describe("AnswerValidator", () => {
         ]);
     });
 
-    //Test 5: Multiple Answers are added to history
+    //Test 6: Multiple Answers are added to history
     it("Should Track Multiple Answers", () => {
         const history = new AnswerHistory();
         const score = {
             answerIncorrect: vi.fn(),
             roomSolved: vi.fn().mockReturnValue(100)
         }
+    
+        const notifications = {
+            send: vi.fn()
+        };
 
-        const validator = new AnswerValidator(history, score);
+        const validator = new AnswerValidator(history, score, notifications);
+
         validator.validateAnswer("5 + 3 = ?", "8", "8", true);
         validator.validateAnswer("10 * 2 = ?", "15", "20", true);
         validator.validateAnswer("12 / 4 = ?", "3", "3", true);
@@ -153,7 +193,11 @@ describe("AnswerValidator", () => {
         roomSolved: vi.fn().mockReturnValue(100)
     };
 
-    const validator = new AnswerValidator(history, score);
+    const notifications = {
+        send: vi.fn()
+    };
+
+        const validator = new AnswerValidator(history, score, notifications);
 
     const result = validator.validateAnswer(
         "3x + 2 = 17",
@@ -165,6 +209,11 @@ describe("AnswerValidator", () => {
     expect(result).toBe(true);
     expect(score.roomSolved).not.toHaveBeenCalled();
     expect(score.answerIncorrect).not.toHaveBeenCalled();
+
+    expect(notifications.send).toHaveBeenCalledOnce();
+    expect(notifications.send).toHaveBeenCalledWith({
+    eventType: 0
+    });
 });
 
 
