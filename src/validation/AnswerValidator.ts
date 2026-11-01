@@ -1,7 +1,7 @@
 import { AnswerHistory } from "./AnswerHistory";
 // import type { ScoreController } from "../score/ScoreController";
 // import type { Event } from "../notifications/Event";
-// import { EventType } from "../notifications/Event";
+// import { EventType, type GameEvent } from "../notifications/Event";
 
 interface ScoreActions {
     answerIncorrect(): void;
@@ -15,10 +15,7 @@ enum EventType {
 }
 
 interface NotificationActions{
-    send(event: {
-        eventType: number;
-        additionalInfo?: string;
-    }): void;
+    send(event: GameEvent): void;
 }
 
 export class AnswerValidator{
@@ -46,10 +43,11 @@ export class AnswerValidator{
         if(!isCorrect){
             this.score.answerIncorrect();
 
+
         //check if it is final submmited answer (NOT intermediate step) 
         //unlocks room and grants rewards
         } else if (isFinalStep){ 
-            this.score.roomSolved("main")
+            this.score.roomSolved("main");
         }
         
         //send notification to notification handler
