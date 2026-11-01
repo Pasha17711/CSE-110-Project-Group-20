@@ -8,14 +8,18 @@ interface ScoreActions {
     roomSolved(kind: "main" | "bonus"): number;
 }
 
-//Replace Kaiyo Event type after merging
+//TODO: Replace Kaiyo Event type after merging
 enum EventType {
     Correct,
     Incorrect
 }
 
+//TODO: Change to send(event: GameEvent): void 
+//after Notification Manager is merged
+
 interface NotificationActions{
-    send(event: GameEvent): void;
+    send(event: {
+    }): void;
 }
 
 export class AnswerValidator{
@@ -30,6 +34,20 @@ export class AnswerValidator{
         this.notifications = notifications;
     }
 
+    //TODO: After Question.ts merged
+    //Accept Question object instead of question:string
+    //keep playerAnswer:string for multi-step questions
+    //Use question.answer as the final answer 
+    //Seven's component will determine isFinalStep.
+    //Update AnswerHistory and unit tests.
+
+    // Future method signature:
+    // validateAnswer(
+    //     question: Question,
+    //     playerAnswer: string,
+    //     expectedAnswer: string,
+    //     isFinalStep: boolean
+    // ): boolean
     validateAnswer(
         question: string, 
         playerAnswer: string, 
@@ -56,6 +74,9 @@ export class AnswerValidator{
         });
 
         //store answer history
+        // TODO: After Question.ts is merged:
+        // store the Question object and expectedAnswer
+        // so incorrect intermediate steps can be reviewed.
         this.history.addResult({
         question: question,
         correctAnswer: correctAnswer,
