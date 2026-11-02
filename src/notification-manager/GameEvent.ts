@@ -8,5 +8,4 @@ export enum EventType {
 
 export interface GameEvent {
   eventType: EventType;
-  additionalInfo?: string;
 }
