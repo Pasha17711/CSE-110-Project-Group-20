@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { Room } from './Room';
-import { MapController, type SwitchMapScreen } from './MapController';
+import { MapController, type SwitchMapScreen, type AccessDeniedPayload } from './MapController';
 
 describe('MapController Tests', () => {
   let controller: MapController;
   let screenChangeMock: ReturnType<typeof vi.fn<(event: SwitchMapScreen) => void>>;
-  let accessDeniedMock: ReturnType<typeof vi.fn<(roomId: string) => void>>;
+  let accessDeniedMock: ReturnType<typeof vi.fn<(payload: AccessDeniedPayload) => void>>;
 
   let placeholderRoomA: Room;
   let placeholderRoomB: Room;
@@ -95,7 +95,7 @@ describe('MapController Tests', () => {
     });
   });
 
-  test('clicking Room C fails prerequisites and emits access denied callback when Room A and/or Room B incomplete', () => {
+  test('clicking Room C fails prerequisites and emits access denied callback when Room A and Room B are incomplete', () => {
     const result = controller.clickRoomButton('room_c');
 
     expect(result).toBe(false);
@@ -103,7 +103,12 @@ describe('MapController Tests', () => {
     expect(controller.activeRoom).toBeNull();
 
     // Verify onAccessDenied triggered and onScreenChange NOT triggered
-    expect(accessDeniedMock).toHaveBeenCalledWith('room_c');
+    expect(accessDeniedMock).toHaveBeenCalledWith({
+      roomId: 'room_c',
+      roomName: 'Room C',
+      missingPrerequisiteIds: ['room_a', 'room_b'],
+      missingPrerequisiteNames: ['Room A', 'Room B'],
+    });
     expect(screenChangeMock).not.toHaveBeenCalled();
   });
 
@@ -120,7 +125,12 @@ describe('MapController Tests', () => {
     expect(controller.activeRoom).toBeNull();
 
     // Verify onAccessDenied triggered and onScreenChange NOT triggered
-    expect(accessDeniedMock).toHaveBeenCalledWith('room_c');
+    expect(accessDeniedMock).toHaveBeenCalledWith({
+      roomId: 'room_c',
+      roomName: 'Room C',
+      missingPrerequisiteIds: ['room_b'],
+      missingPrerequisiteNames: ['Room B'],
+    });
     expect(screenChangeMock).not.toHaveBeenCalled();
   });
 

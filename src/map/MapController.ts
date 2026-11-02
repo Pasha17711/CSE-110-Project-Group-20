@@ -6,6 +6,13 @@ export interface SwitchMapScreen {
     name: string;
 }
 
+export interface AccessDeniedPayload {
+  roomId: string;
+  roomName: string;
+  missingPrerequisiteIds: string[];
+  missingPrerequisiteNames: string[];
+}
+
 export class MapController {
   private rooms: Map<string, Room> = new Map();
   public currentScreen: string = 'map';
@@ -18,7 +25,7 @@ export class MapController {
    * MapController will emit navigation requests for ScreenController to receive
   */
   public onScreenChange: ((event: SwitchMapScreen) => void) | null = null;
-  public onAccessDenied: ((roomId: string) => void) | null = null;
+  public onAccessDenied: ((payload: AccessDeniedPayload) => void) | null = null;
 
   public registerRoom(room: Room): void {
     this.rooms.set(room.id, room);
@@ -52,7 +59,7 @@ export class MapController {
         name: 'Results',
       });
     }
-    
+
   }
 
   // Called when player presses on a room button
@@ -62,6 +69,7 @@ export class MapController {
         return false;
     }
 
+    const completedRoomsList = Array.from(this.completedRooms);
     const canEnter = room.isAccessible(Array.from(this.completedRooms));
 
     if (canEnter) {
@@ -83,7 +91,14 @@ export class MapController {
     }
 
     if (this.onAccessDenied) {
-      this.onAccessDenied(room.id);
+      const missingIds = room.getMissingPrerequisites(completedRoomsList);
+      const missingNames = missingIds.map((id) => this.rooms.get(id)?.name || id);
+      this.onAccessDenied({
+        roomId: room.id,
+        roomName: room.name,
+        missingPrerequisiteIds: missingIds,
+        missingPrerequisiteNames: missingNames,
+      });
     }
     return false;
   }

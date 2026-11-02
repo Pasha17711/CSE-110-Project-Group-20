@@ -24,7 +24,9 @@ export class Room {
   }
 
   /**
-   * Checks if room can be entered based on completed room IDs
+   * 
+   * @param completedRoomIds 
+   * @returns true/false according to whether room can be entered based on completed room IDs
    */
   public isAccessible(completedRoomIds: string[] = []) {
     if (this.prerequisites.length == 0) {
@@ -32,6 +34,15 @@ export class Room {
     } else {
         return this.prerequisites.every((reqId) => completedRoomIds.includes(reqId));
     }
+  }
+
+  /**
+   * 
+   * @param completedRoomIds 
+   * @returns list of prerequisite rooms not completed
+   */
+  public getMissingPrerequisites(completedRoomIds: string[] = []): string[] {
+    return this.prerequisites.filter((reqId) => !completedRoomIds.includes(reqId));
   }
 
   /**
