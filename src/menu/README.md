@@ -22,8 +22,8 @@ question generator, answer validator, or score model is imported.
 
 ## Files and responsibilities
 
-- `MenuController.ts`: owns start/playing/results state and selected difficulty;
-  starts, restarts, accepts results, and returns to the menu.
+- `MenuController.ts`: owns local menu state, selected difficulty, and results;
+  requests game start/cleanup through callbacks and handles replay/back actions.
 - `GameResults.ts`: declares the compatible snapshot subset, checks input, and
   prepares text for the results screen. It does not calculate scores.
 - `MenuView.ts`: creates DOM controls and renders the current menu screen.
@@ -58,6 +58,44 @@ uncaught ending. This display condition does not change the score.
 
 ## Connecting the team's features later
 
+### Ownership with Feesh's ScreenController and Game
+
+Feesh's `ScreenController` owns application-wide navigation, including map and
+room screens. His `Game` module owns creating and ending runs, score/map state,
+timers, and subscriptions. This menu component does not implement either module
+and does not import them. Its `start`, `playing`, and `results` states only track
+the menu workflow; `playing` means that gameplay has control, not a particular room.
+
+The existing integration points are sufficient for a small adapter:
+
+| Menu integration point | Application responsibility |
+| --- | --- |
+| Constructor's `onStartGame(difficulty)` | Ask Game to start a fresh run with that difficulty. Play Again uses this same callback. |
+| Constructor's `onLeaveGame()` | Release the active run's resources through Game. Make cleanup safe if Game has already ended the run. |
+| `showResults(snapshot)` | Game supplies its finalized score snapshot for either ending. |
+| `onScreenChange` and `currentScreen` | Notify ScreenController of a menu transition and render the appropriate menu view. |
+| `MenuView.render()` | Render or hide only the menu's supplied root element. |
+
+Keep navigation in one adapter path. If Game already tells ScreenController where
+to navigate, the menu callback should not repeat that navigation. Rendering a
+screen must not call `startGame`, `showResults`, or `backToMenu` again: those are
+actions, not render hooks. Likewise, the cleanup callback must not call
+`showResults` recursively. Room-to-room navigation never goes through this menu.
+
+Start the session through `menu.startGame(difficulty)` so its local state is
+ready before Game later supplies results. `showResults` rejects a different
+difficulty and ignores results outside an active session. Callbacks are currently
+synchronous; asynchronous game startup would need a separately agreed extension.
+
+`src/main.ts` is the standalone demo wiring. When Feesh's application entry point
+is integrated, replace that demo wiring with the adapter instead of running both
+bootstraps. `DemoGame.ts` and its fixtures are not production Game behavior.
+Do not copy the demo's `gameRoot.hidden` routing into a second application router.
+The actual ScreenController/Game method names have not yet been verified against
+published code; this describes the menu's contract, not an implemented adapter.
+
+### Score and map data
+
 The inspected score and map branches were not merged into this feature. The
 snapshot subset is structurally compatible with Ping-Shu's `ScoreSnapshot`:
 
@@ -71,16 +109,14 @@ The required fields are `difficulty`, `money`, `roomsSolved`, `bonusRoomsSolved`
 Extra snapshot fields are accepted. All required statistics must be supplied;
 missing data is rejected rather than presented as a real zero.
 
-- Replace the `showDemo` callback in `main.ts` with setup for a fresh score model,
-  score controller, and map. Create fresh run state on every start/replay.
-- Connect score's `onTimeUp` callback to `menu.showResults(snapshot)`.
-- Connect map's `onScreenChange` event with `screen === "results"` to the same
-  method. Other map/room transitions belong to the gameplay view.
-- Provide the cleanup callback to dispose the old score controller, remove
-  subscriptions, and release game resources. Disconnect previous-run callbacks
-  before replay; the menu does not attach run IDs to snapshots.
-- Wire `menu.onScreenChange` to render the menu and show/hide the gameplay container,
-  as the demo does. `MenuView.render()` hides its own container while playing.
+- Replace the `showDemo` callback with a call into Game's run setup. Game creates
+  fresh score and map state on each start/replay.
+- Game connects score timeout and successful map completion to a single ending
+  path that finalizes the snapshot and passes it to `menu.showResults(snapshot)`.
+- Game supplies cleanup for timers and subscriptions. Disconnect previous-run
+  callbacks before replay; the menu does not attach run IDs to snapshots.
+- The application adapter connects menu changes to ScreenController. Keep all
+  map/room routing with ScreenController and all resource ownership with Game.
 - Use `textContent` for result data. The only `innerHTML` here is fixed demo markup.
 
 `roomsSolved` already includes bonus rooms. Do not add them again.
