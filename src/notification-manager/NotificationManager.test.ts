@@ -18,7 +18,7 @@ describe("NotificationManager", () => {
       const handler = vi.fn();
       manager.subscribe(EventType.Correct, handler);
 
-      const event: GameEvent = { eventType: EventType.Correct, additionalInfo: "+10" };
+      const event: GameEvent = { eventType: EventType.Correct };
       manager.send(event);
 
       expect(handler).toHaveBeenCalledTimes(1);
