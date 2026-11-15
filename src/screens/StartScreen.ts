@@ -468,7 +468,7 @@ export class StartScreen implements StartScreenContract {
         x: mx + 400,
         y: rowY,
         width: 260,
-        text: `$${entry.score.toLocaleString()}  (${mins}:${secs})`,
+        text: `${entry.score.toLocaleString()}  (${mins}:${secs})`,
         align: "right",
         fontSize: 22,
         fill: COLORS.purple,

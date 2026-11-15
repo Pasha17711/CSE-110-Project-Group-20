@@ -117,7 +117,7 @@ describe("StartScreen", () => {
     // Open modal -> defaults to Easy tab
     click(screen, "trophy-button");
     expect(visibleTexts(screen.layer)).toEqual(
-      expect.arrayContaining(["🏆 HIGH SCORES", "#1  Alice", "$14,000  (1:35)"]),
+      expect.arrayContaining(["🏆 HIGH SCORES", "#1  Alice", "14,000  (1:35)"]),
     );
 
     // Switch to Medium tab (empty state)
@@ -129,7 +129,7 @@ describe("StartScreen", () => {
     // Switch to Hard tab
     click(screen, "leaderboard-tab-hard");
     expect(visibleTexts(screen.layer)).toEqual(
-      expect.arrayContaining(["#1  Bob", "$21,500  (3:05)"]),
+      expect.arrayContaining(["#1  Bob", "21,500  (3:05)"]),
     );
 
     // Close modal
