@@ -448,8 +448,8 @@ export class StartScreen implements StartScreenContract {
       return;
     }
 
-    entries.slice(0, 8).forEach((entry, i) => {
-      const rowY = startY + i * 42;
+    entries.slice(0, 10).forEach((entry, i) => {
+      const rowY = startY + i * 36;
       const seconds = Math.floor(entry.timeSpentMs / 1000);
       const mins = Math.floor(seconds / 60);
       const secs = String(seconds % 60).padStart(2, "0");
