@@ -45,6 +45,7 @@ export class StartScreen implements StartScreenContract {
 
     // Main Title 
     this.layer.add(new Konva.Text({
+      x: 0,
       y: 30,
       width: DESIGN_WIDTH,
       text: "Seven's Wonderful\nBank Heist !!",
@@ -68,7 +69,7 @@ export class StartScreen implements StartScreenContract {
 
     // Credits Button
     const creditsText = createText({
-      x: DESIGN_WIDTH - 60,
+      x: DESIGN_WIDTH - 135 - 40,
       y: DESIGN_HEIGHT - 44,
       width: 135,
       text: "Credits  >",
