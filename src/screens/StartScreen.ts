@@ -1,6 +1,5 @@
 import Konva from "konva";
-import { Difficulty, DIFFICULTY_LABEL } from "../score";
-import { Leaderboard, formatTime, type LeaderboardEntry } from "../score";
+import { Difficulty, DIFFICULTY_LABEL, Leaderboard, formatTime, type LeaderboardEntry } from "../score";
 import type { StartScreen as StartScreenContract, Unsubscribe } from "./contracts";
 import { DESIGN_HEIGHT, DESIGN_WIDTH, fitLayer } from "./layout";
 import { Listeners } from "./listeners";
@@ -23,19 +22,20 @@ export class StartScreen implements StartScreenContract {
   // Optional callbacks for secondary menu buttons
   private readonly tutorials = new Listeners<[]>();
   private readonly settings = new Listeners<[]>();
-  private readonly leaderboard = new Listeners<[]>();
+  private readonly leaderboardClicks = new Listeners<[]>();
   private readonly credits = new Listeners<[]>();
 
-  private readonly leaderboardBoard?: Leaderboard;
+  private readonly leaderboard?: Leaderboard;
   private readonly leaderboardModal = new Konva.Group({ visible: false });
   private selectedBoardDifficulty: Difficulty = Difficulty.Easy;
 
   private readonly mainMenuGroup = new Konva.Group();
   private readonly difficultyGroup = new Konva.Group({ visible: false });
   private readonly boardRowsGroup = new Konva.Group();
+  private readonly boardTabs = new Map<Difficulty, Konva.Group>();
 
   constructor(stageWidth: number, stageHeight: number, leaderboard?: Leaderboard) {
-    this.leaderboardBoard = leaderboard;
+    this.leaderboard = leaderboard;
 
     fitLayer(this.layer, stageWidth, stageHeight);
     this.layer.add(createBackground());
@@ -337,8 +337,9 @@ export class StartScreen implements StartScreenContract {
     badge.on("mouseenter", () => setCursor(badge, "pointer"));
     badge.on("mouseleave", () => setCursor(badge, ""));
     badge.on("click tap", () => {
-      this.leaderboard.emit();
-      if (this.leaderboardBoard) {
+      this.leaderboardClicks.emit();
+      if (this.leaderboard) {
+        this.updateLeaderboardTabStyles();
         this.renderLeaderboardRows(this.selectedBoardDifficulty);
         this.leaderboardModal.moveToTop();
         this.leaderboardModal.show();
@@ -391,7 +392,7 @@ export class StartScreen implements StartScreenContract {
 
     DIFFICULTIES.forEach((diff, idx) => {
       const label = DIFFICULTY_LABEL[diff].toUpperCase();
-      this.leaderboardModal.add(this.createStyledMenuButton({
+      const tab = this.createStyledMenuButton({
         x: tabsStartX + idx * (tabW + tabGap),
         y: my + 82,
         width: tabW,
@@ -401,11 +402,16 @@ export class StartScreen implements StartScreenContract {
         name: `leaderboard-tab-${label.toLowerCase()}`,
         onClick: () => {
           this.selectedBoardDifficulty = diff;
+          this.updateLeaderboardTabStyles();
           this.renderLeaderboardRows(diff);
           this.layer.batchDraw();
         },
-      }));
+      });
+      this.boardTabs.set(diff, tab);
+      this.leaderboardModal.add(tab);
     });
+
+    this.updateLeaderboardTabStyles();
 
     this.leaderboardModal.add(this.boardRowsGroup);
 
@@ -427,13 +433,20 @@ export class StartScreen implements StartScreenContract {
     this.layer.add(this.leaderboardModal);
   }
 
+  private updateLeaderboardTabStyles(): void {
+    for (const [diff, tab] of this.boardTabs) {
+      const isSelected = diff === this.selectedBoardDifficulty;
+      tab.opacity(isSelected ? 1 : 0.67);
+    }
+  }
+
   private renderLeaderboardRows(difficulty: Difficulty): void {
     this.boardRowsGroup.destroyChildren();
 
     const modalW = 720;
     const mx = (DESIGN_WIDTH - modalW) / 2;
     const startY = 300;
-    const entries: LeaderboardEntry[] = this.leaderboardBoard?.getEntries(difficulty) ?? [];
+    const entries: LeaderboardEntry[] = this.leaderboard?.getEntries(difficulty) ?? [];
 
     if (entries.length === 0) {
       this.boardRowsGroup.add(createText({
@@ -487,7 +500,7 @@ export class StartScreen implements StartScreenContract {
   }
 
   onLeaderboard(cb: () => void): Unsubscribe {
-    return this.leaderboard.add(cb);
+    return this.leaderboardClicks.add(cb);
   }
 
   onCredits(cb: () => void): Unsubscribe {
