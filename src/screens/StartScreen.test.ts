@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("konva", () => import("./testing/fakeKonva"));
 
 import { StartScreen } from "./StartScreen";
-import { Difficulty, Leaderboard, type StorageLike } from "../score";
+import { Difficulty, Leaderboard, formatTime, type StorageLike } from "../score";
 import { visibleTexts } from "./testing/fakeKonva";
 
 function click(screen: StartScreen, name: string): void {
@@ -117,7 +117,7 @@ describe("StartScreen", () => {
     // Open modal -> defaults to Easy tab
     click(screen, "trophy-button");
     expect(visibleTexts(screen.layer)).toEqual(
-      expect.arrayContaining(["🏆 HIGH SCORES", "#1  Alice", "14,000  (1:35)"]),
+      expect.arrayContaining(["🏆 HIGH SCORES", "#1  Alice", `14,000  (${formatTime(95_000)})`]),
     );
 
     // Switch to Medium tab (empty state)
@@ -129,7 +129,7 @@ describe("StartScreen", () => {
     // Switch to Hard tab
     click(screen, "leaderboard-tab-hard");
     expect(visibleTexts(screen.layer)).toEqual(
-      expect.arrayContaining(["#1  Bob", "21,500  (3:05)"]),
+      expect.arrayContaining(["#1  Bob", `21,500  (${formatTime(185_000)})`]),
     );
 
     // Close modal

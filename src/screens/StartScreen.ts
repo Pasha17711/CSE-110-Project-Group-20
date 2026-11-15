@@ -1,6 +1,6 @@
 import Konva from "konva";
 import { Difficulty, DIFFICULTY_LABEL } from "../score";
-import { Leaderboard, type LeaderboardEntry } from "../score";
+import { Leaderboard, formatTime, type LeaderboardEntry } from "../score";
 import type { StartScreen as StartScreenContract, Unsubscribe } from "./contracts";
 import { DESIGN_HEIGHT, DESIGN_WIDTH, fitLayer } from "./layout";
 import { Listeners } from "./listeners";
@@ -450,10 +450,8 @@ export class StartScreen implements StartScreenContract {
 
     entries.slice(0, 10).forEach((entry, i) => {
       const rowY = startY + i * 36;
-      const seconds = Math.floor(entry.timeSpentMs / 1000);
-      const mins = Math.floor(seconds / 60);
-      const secs = String(seconds % 60).padStart(2, "0");
-
+      const formattedTime = formatTime(entry.timeSpentMs);
+      
       this.boardRowsGroup.add(createText({
         x: mx + 56,
         y: rowY,
@@ -468,7 +466,7 @@ export class StartScreen implements StartScreenContract {
         x: mx + 400,
         y: rowY,
         width: 260,
-        text: `${entry.score.toLocaleString()}  (${mins}:${secs})`,
+        text: `${entry.score.toLocaleString("en-US")}  (${formatTime(entry.timeSpentMs)})`,
         align: "right",
         fontSize: 22,
         fill: COLORS.purple,
