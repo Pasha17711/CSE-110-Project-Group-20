@@ -19,6 +19,22 @@ const NAME_BOX = { x: STATS.x + 150, y: 660, width: 300, height: 50 };
  * that Difficulty, and a name box to save an Escaped score.
  * Reworked from the results screen in #28 (Asad) as a passive Konva screen.
  */
+
+interface StepMistake {
+    stepNumber: number;
+    stepPrompt?: string;
+    firstIncorrectAnswer: string;
+    correctAnswer: string;
+    incorrectAttempts: number;
+}
+
+
+interface ReviewEntry {
+    question: AnswerRecord["question"];
+    solved: boolean;
+    mistakes: StepMistake[];
+}
+
 export class EndScreen implements EndScreenContract {
   readonly layer = new Konva.Layer();
 
@@ -51,8 +67,11 @@ export class EndScreen implements EndScreenContract {
   private readonly reviewCounterText: Konva.Text;
   private readonly reviewStatusText: Konva.Text;
   private readonly reviewStatusBubble: Konva.Rect;
+  private readonly reviewMistakesGroup = new Konva.Group({
+    name: "review-mistakes"
+  });
 
-  private reviewAnswers: AnswerRecord[] = [];
+  private reviewAnswers: ReviewEntry[] = [];
   private reviewIndex = 0;
 
   constructor(stageWidth: number, stageHeight: number) {
@@ -136,6 +155,7 @@ export class EndScreen implements EndScreenContract {
     label: "Review Answers",
     name: "review-answers",
     onClick: () => {
+        this.nameInput.hide();
         this.showReviewQuestion();
         this.reviewModal.show();
         this.layer.batchDraw();
@@ -203,7 +223,7 @@ export class EndScreen implements EndScreenContract {
     y: 430,
     width: 840,
     text: "Your answer: —",
-    fontSize: 26,
+    fontSize: 22,
     fill: COLORS.purple
   });
 
@@ -213,14 +233,14 @@ export class EndScreen implements EndScreenContract {
     y: 510,
     width: 840,
     text: "Correct answer: —",
-    fontSize: 26,
+    fontSize: 22,
     fill: COLORS.purple
   });
 
   //Display question number
   this.reviewCounterText = createText({
     x: 860,
-    y: 580,
+    y: 610,
     width: 300,
     text: "Question 0 of 0",
     fontSize: 22,
@@ -230,9 +250,9 @@ export class EndScreen implements EndScreenContract {
 
 //Status Bubble
 this.reviewStatusBubble = new Konva.Rect({
-    x: 630,
+    x: 570,
     y: 352,
-    width: 180,
+    width: 300,
     height: 48,
     cornerRadius: 24,
     fill: "#FEE2E2"
@@ -240,9 +260,9 @@ this.reviewStatusBubble = new Konva.Rect({
 
 //Display correct/incorrect status
   this.reviewStatusText = createText({
-    x: 630,
+    x: 570,
     y: 352,
-    width: 180,
+    width: 300,
     height: 48,
     text: "",
     fontSize: 22,
@@ -257,11 +277,14 @@ this.reviewStatusBubble = new Konva.Rect({
     this.reviewCorrectAnswerText,
     this.reviewCounterText,
     this.reviewStatusBubble,
-    this.reviewStatusText
+    this.reviewStatusText,
+    this.reviewMistakesGroup
   );
 
+
+
   this.reviewModal.add(new Konva.Line({
-    points: [280, 625, 1160, 625],
+    points: [280, 650, 1160, 650],
     stroke: COLORS.purple,
     strokeWidth: 2,
     opacity: 0.3
@@ -309,6 +332,7 @@ this.reviewStatusBubble = new Konva.Rect({
     name: "close-review",
     onClick: () => {
         this.reviewModal.hide();
+        this.refreshNameBox();
         this.layer.batchDraw();
     }
   }));
@@ -328,36 +352,60 @@ this.reviewStatusBubble = new Konva.Rect({
 
     const { outcome, snapshot } = result;
 
-    const finalAnswers = result.history.filter(
-      (record) => record.isLastStep
-    );
+    //track the current step of each question
+    const stepByQuestion = new Map<AnswerRecord["question"], number>();
 
-    //Saves latest final submission by overwritting old with latest record
-    const latestByQuestion = new Map(
-      finalAnswers.map((record) => [record.question, record] as const)
-    );
+    // store one review entry per question
+    const reviews = new Map<AnswerRecord["question"], ReviewEntry>();
 
-    //Convert into array so we can filter incorrect and correct questions
-    const uniqueFinalAnswers = [...latestByQuestion.values()];
-    console.log(uniqueFinalAnswers);
+    for (const record of result.history) {
+        let review = reviews.get(record.question);
 
-    const incorrectQuestions = uniqueFinalAnswers.filter(
-    (record) => !record.isCorrect
-    );  
+        // create a review entry when we first encounter a question
+        if (!review) {
+            review = {
+                question: record.question,
+                solved: false,
+                mistakes: []
+            };
 
-    const correctQuestions = uniqueFinalAnswers.filter(
-    (record) => record.isCorrect
-    );
+            reviews.set(record.question, review);
+        }
 
-    this.reviewAnswers = [
-      ...incorrectQuestions,
-      ...correctQuestions
-    ];
+        const step = stepByQuestion.get(record.question) ?? 0;
+
+        if (!record.isCorrect) {
+            // check whether this step already has a recorded mistake
+            const existing = review.mistakes.find(
+                mistake => mistake.stepNumber === step + 1
+            );
+
+            if (existing) {
+                existing.incorrectAttempts++;
+            } else {
+                review.mistakes.push({
+                    stepNumber: step + 1,
+                    stepPrompt: record.stepPrompt,
+                    firstIncorrectAnswer: record.playerAnswer,
+                    correctAnswer: record.correctAnswer,
+                    incorrectAttempts: 1
+                });
+            }
+        } else {
+            // correct answers advance the step
+            stepByQuestion.set(record.question, step + 1);
+
+            // mark the question solved when its final step is correct
+            if (record.isLastStep) {
+                review.solved = true;
+            }
+        }
+    }
+
+    this.reviewAnswers = [...reviews.values()];
+    
 
     this.reviewIndex = 0;
-
-    console.log("Incorrect:", incorrectQuestions);
-    console.log("Correct:", correctQuestions);
     
     const escaped = outcome === "escaped";
     this.outcome.text(escaped ? "Escaped!" : "Caught!");
@@ -379,9 +427,9 @@ this.reviewStatusBubble = new Konva.Rect({
   }
 
   private showReviewQuestion(): void {
-    const record = this.reviewAnswers[this.reviewIndex];
+     const review = this.reviewAnswers[this.reviewIndex];
 
-    if (!record) {
+    if (!review) {
         this.reviewCounterText.text("Question 0 of 0");
         this.reviewQuestionText.text("No answers to review.");
         this.reviewPlayerAnswerText.text("");
@@ -391,33 +439,117 @@ this.reviewStatusBubble = new Konva.Rect({
         return;
     }
 
+    // determine the question status
+    let status: string;
+    let backgroundColor: string;
+    let textColor: string;
+
+    if (!review.solved) {
+        status = "Not solved";
+        backgroundColor = "#FEE2E2";
+        textColor = "#DC2626";
+    } else if (review.mistakes.length > 0) {
+        status = "Solved with mistakes";
+        backgroundColor = "#FEF3C7";
+        textColor = "#92400E";
+    } else {
+        status = "Solved";
+        backgroundColor = "#DCFCE7";
+        textColor = "#15803D";
+    }
+
     this.reviewStatusBubble.show();
+    this.reviewStatusBubble.fill(backgroundColor);
+    this.reviewStatusText.text(status);
+    this.reviewStatusText.fill(textColor);
 
-    this.reviewStatusBubble.fill(
-    record.isCorrect ? "#DCFCE7" : "#FEE2E2"
-    );
-
-    this.reviewStatusText.text(
-    record.isCorrect ? "Correct!" : "Incorrect"
-    );
-
-    this.reviewStatusText.fill(
-    record.isCorrect ? "#15803D" : "#DC2626"
-    );
-
+    // show question number and original equation
     this.reviewCounterText.text(
-    `Question ${this.reviewIndex + 1} of ${this.reviewAnswers.length}`
+        `Question ${this.reviewIndex + 1} of ${this.reviewAnswers.length}`
     );
 
-    this.reviewQuestionText.text(record.question.prompt);
+    this.reviewQuestionText.text(review.question.prompt);
 
-    this.reviewPlayerAnswerText.text(
-        `Your answer: ${record.playerAnswer}`
-    );
+    // display first incorrect answer for each mistaken step
+    
+    // clear previous questions mistake cards
+    this.reviewMistakesGroup.destroyChildren();
 
-    this.reviewCorrectAnswerText.text(
-        `Correct answer: ${record.correctAnswer}`
-    );
+    // remove the old combined text
+    this.reviewPlayerAnswerText.text("");
+
+    if (review.mistakes.length === 0) {
+        this.reviewPlayerAnswerText.text("No incorrect attempts!");
+        this.reviewCorrectAnswerText.text("");
+    } else {
+        // display up to four mistakes in a two-column grid
+        const visibleMistakes = review.mistakes.slice(0, 4);
+
+        visibleMistakes.forEach((mistake, index) => {
+            const column = index % 2;
+            const row = Math.floor(index / 2);
+
+            const x = 300 + column * 430;
+            const y = 410 + row * 96;
+
+            const card = new Konva.Group({ x, y });
+
+            card.add(new Konva.Rect({
+                width: 410,
+                height: 88,
+                fill: "#F7F3FC",
+                stroke: "#D7CDEA",
+                strokeWidth: 2,
+                cornerRadius: 10
+            }));
+
+            card.add(createText({
+                x: 16,
+                y: 12,
+                width: 378,
+                text: `Step ${mistake.stepNumber} — ${mistake.stepPrompt ?? "Choose an operation"}`,
+                fontSize: 20,
+                fill: COLORS.purple,
+                wrap: "none",
+                ellipsis: true
+            }));
+
+            card.add(createText({
+                x: 16,
+                y: 49,
+                width: 180,
+                text: `Your attempt: ${mistake.firstIncorrectAnswer}`,
+                fontSize: 18,
+                fill: "#B91C1C",
+                wrap: "none",
+                ellipsis: true
+            }));
+
+            card.add(createText({
+                x: 212,
+                y: 49,
+                width: 180,
+                text: `Expected: ${mistake.correctAnswer}`,
+                fontSize: 18,
+                fill: "#15803D",
+                wrap: "none",
+                ellipsis: true
+            }));
+
+            this.reviewMistakesGroup.add(card);
+        });
+
+        const totalMistakes = review.mistakes.reduce(
+            (total, mistake) => total + mistake.incorrectAttempts,
+            0
+        );
+
+        this.reviewCorrectAnswerText.y(610);
+        this.reviewCorrectAnswerText.text(
+            `Total incorrect attempts: ${totalMistakes}` 
+        );
+    }
+
 }
 
   onSaveScore(cb: (playerName: string) => void): Unsubscribe {

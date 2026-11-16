@@ -7,6 +7,7 @@ export interface AnswerRecord {
     correctAnswer: string;
     isCorrect: boolean;
     isLastStep: boolean;
+    stepPrompt?: string;
 }
 
 /** Every Answer given during one Heist, in order. */

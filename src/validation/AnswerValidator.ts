@@ -39,6 +39,7 @@ export class AnswerValidator {
             correctAnswer: answer.correctAnswer,
             isCorrect,
             isLastStep: answer.isLastStep,
+            stepPrompt: answer.stepPrompt,
         });
 
         return isCorrect;
