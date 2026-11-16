@@ -90,6 +90,26 @@ describe('MultistepSolverModel', () => {
       expect(model.arithmeticProblems()).toEqual(expected)
     })
 
+    // Issue #44: a negative factor after `*` or `/` is stored as its magnitude
+    // with positive: false, and its sign must count toward the coefficient.
+    it.each<[string, Term[], string]>([
+      [
+        'x * (-99) - x',
+        [variableTerm('x', true), '*', numberTerm('99', false), variableTerm('x', false)],
+        '-x * 100',
+      ],
+      [
+        'x / (-4) - x * (-7)',
+        [variableTerm('x', true), '/', numberTerm('4', false), variableTerm('x', false), '*', numberTerm('7', false)],
+        'x * 27/4',
+      ],
+    ])('keeps the sign of a negative factor when combining %s', (_name, left, answer) => {
+      const model = new MultistepSolverModel()
+      addSide(model, left, [constantTerm(0)])
+
+      expect(model.arithmeticProblems().map(([, a]) => a)).toEqual([answer])
+    })
+
     it('finds problems on both sides in left-to-right order', () => {
       const model = new MultistepSolverModel()
       addSide(model,
