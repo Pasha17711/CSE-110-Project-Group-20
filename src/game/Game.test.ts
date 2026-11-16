@@ -80,6 +80,7 @@ class FakeRoomScreen implements RoomScreen {
   hud: Hud | null = null;
   readonly answer = new Slot<[StepAnswer]>();
   readonly exit = new Slot<[]>();
+  readonly hint = new Slot<[]>();
 
   show(): void {}
   hide(): void {}
@@ -102,6 +103,12 @@ class FakeRoomScreen implements RoomScreen {
   }
   leave(): void {
     this.exit.fire();
+  }
+  onHint(cb: () => void): Unsubscribe {
+    return this.hint.set(cb);
+  }
+  useHint(): void {
+    this.hint.fire();
   }
 }
 
@@ -274,6 +281,21 @@ describe("Game", () => {
     expect(roomScreen.hud?.timeRemainingMs).toBe(DEFAULT_TIME_LIMIT_MS - PENALTY_MS);
     expect(shown).toEqual(["map", "room"]);
     expect(mapScreen.solved).toEqual([]);
+  });
+
+  it("charges hints only against the room where they were used, even after re-entry", () => {
+    game.start();
+    mapScreen.click("room_a");
+    roomScreen.useHint();
+    roomScreen.leave();
+    mapScreen.click("room_a");
+    roomScreen.useHint();
+    roomScreen.useHint(); // More than two hints cannot be charged.
+    roomScreen.submit(lastStep(mapScreen.room("room_a").question));
+    expect(mapScreen.hud?.money).toBe(50);
+    expect(count(EventType.HintUsed)).toBe(2);
+    enterAndSolve("room_b");
+    expect(mapScreen.hud?.money).toBe(150);
   });
 
   it("a correct last Step in a Main Room solves it, adds money and returns to the map", () => {
