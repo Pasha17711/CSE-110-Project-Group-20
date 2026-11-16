@@ -93,8 +93,11 @@ export class PowerBoxModel {
     if (this.isLeftMatched(left) || this.isRightMatched(right)) {
       throw new Error("That wire is already connected");
     }
-    const isLastStep = this.matchedCount === this.size - 1;
     const correct = this.rightOrder[right] === left;
+    // Only a correct match can finish the box. (With one wire left, the only
+    // free left and right rows belong together, so a wrong try can't happen
+    // there anyway; checking `correct` keeps that from depending on it.)
+    const isLastStep = correct && this.matchedCount === this.size - 1;
     if (correct) this.matchedLeft.add(left);
 
     return {

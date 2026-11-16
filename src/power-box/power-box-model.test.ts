@@ -70,6 +70,22 @@ describe("PowerBoxModel", () => {
     expect(box.matchedCount).toBe(1);
   });
 
+  it("a wrong try is never the last Step, even with one wire left", () => {
+    box.match(0, 1);
+    box.match(1, 2);
+    // One wire left: wrong tries are only possible with free rows, and those
+    // two rows belong together, so a wrong try here can only reuse a connected
+    // row, which throws instead of being reported as the last Step.
+    expect(() => box.match(2, 1)).toThrow();
+    expect(box.isFinished()).toBe(false);
+
+    const twoLeft = new PowerBoxModel(PAIRS, RIGHT_ORDER);
+    twoLeft.match(0, 1);
+    const wrong = twoLeft.match(1, 0);
+    expect(wrong.correct).toBe(false);
+    expect(wrong.answer.isLastStep).toBe(false);
+  });
+
   it("ignores spaces around an answer", () => {
     const spaced = new PowerBoxModel([{ question: { prompt: "x = 3", answer: " 3 " } }], [0]);
     expect(spaced.answers()).toEqual(["3"]);
