@@ -30,12 +30,14 @@ export interface MapScreen extends Screen {
 
 export interface RoomScreen extends Screen {
   /** Builds a fresh puzzle, so the Room restarts from Step 1. */
-  setQuestion(question: Question, roomName: string): void;
+  setQuestion(question: Question, roomName: string, usedHints?: number): void;
   /** Format with formatTime / formatMoney from score. */
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void;
   /** One call per Step's Answer, operation picks included. */
   onAnswer(cb: (answer: StepAnswer) => void): Unsubscribe;
   onExit(cb: () => void): Unsubscribe;
+  /** Optional for fake screens and older screen implementations. */
+  onHint?(cb: () => void): Unsubscribe;
 }
 
 export interface EndScreen extends Screen {
