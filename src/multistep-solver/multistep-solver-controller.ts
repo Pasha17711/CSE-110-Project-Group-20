@@ -21,6 +21,12 @@ class MultistepSolverController {
   private equation = ''
 
   public onStateChange?: (newState: MultistepSolverState) => void
+  /**
+   * Called with the expression to work out (e.g. `8 - 3`) each time an
+   * Arithmetic Step begins, including one that directly follows another,
+   * which `onStateChange` does not report.
+   */
+  public onArithmeticStep?: (expression: string) => void
   public onAnswerSubmit?: (
     question: string,
     playerAnswer: string,
@@ -258,7 +264,15 @@ class MultistepSolverController {
     }
 
     this.view.showDropzone()
-    this.setState(this.model.arithmeticProblems().length > 0 ? 'Arithmetic' : 'Idle')
+    const problems = this.model.arithmeticProblems()
+    if (problems.length === 0) {
+      this.setState('Idle')
+      return
+    }
+
+    // State first, so listeners show the input before it is labelled.
+    this.setState('Arithmetic')
+    this.onArithmeticStep?.(problems[0][0])
   }
 }
 
