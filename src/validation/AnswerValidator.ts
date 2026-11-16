@@ -22,11 +22,11 @@ export class AnswerValidator {
      * Correct last Step → RoomSolved, then Correct.
      * Correct earlier Step → Correct only. Returns whether it was correct.
      */
-    validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind): boolean {
+    validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind, roomId?: string): boolean {
         const isCorrect = answer.playerAnswer.trim() === answer.correctAnswer.trim();
 
         if (isCorrect && answer.isLastStep) {
-            this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind });
+            this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind, roomId });
         }
 
         this.notifications.send({
