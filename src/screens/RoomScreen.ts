@@ -4,6 +4,7 @@ import type { NotificationManager } from "../notification-manager/NotificationMa
 import { EventType } from "../notification-manager/GameEvent";
 import type { Question, StepAnswer } from "../questions/Question";
 import { WRONG_ANSWER_PENALTY_SECONDS } from "../score";
+import { MAX_HINTS_PER_ROOM } from "../score/ScoreModel";
 import type { RoomScreen as RoomScreenContract, Unsubscribe } from "./contracts";
 import { Hud } from "./Hud";
 import { DESIGN_WIDTH, fitLayer } from "./layout";
@@ -25,10 +26,15 @@ export class RoomScreen implements RoomScreenContract {
 
   private readonly answers = new Listeners<[StepAnswer]>();
   private readonly exits = new Listeners<[]>();
+  private readonly hints = new Listeners<[]>();
   private readonly hud = new Hud();
   private readonly roomName: Konva.Text;
   private readonly feedback: Konva.Text;
   private puzzle: BasicMultistepPuzzle | null = null;
+  private activeQuestion: Question | null = null;
+  private usedHints = 0;
+  private readonly hintModal = new Konva.Group({ visible: false, name: "hint-modal" });
+  private readonly hintMessage: Konva.Text;
   private feedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(stageWidth: number, stageHeight: number, notifications: NotificationManager) {
@@ -44,6 +50,14 @@ export class RoomScreen implements RoomScreenContract {
       name: "room-name",
     });
     this.layer.add(this.roomName);
+
+    this.layer.add(createButton({
+      x: DESIGN_WIDTH - 225, y: 100,
+      width: 170, height: 48,
+      label: "Hint",
+      name: "hint-button",
+      onClick: () => this.requestHint(),
+    }));
 
     this.layer.add(createButton({
       x: 20, y: 100,
@@ -63,6 +77,40 @@ export class RoomScreen implements RoomScreenContract {
     });
     this.layer.add(this.feedback);
 
+    // Figma 124:2: dim the game, show a large gray hint dialog and green return button.
+    this.hintModal.add(new Konva.Rect({
+      width: DESIGN_WIDTH, height: 900, fill: "rgba(0,0,0,0.55)", name: "hint-dim",
+    }));
+    this.hintModal.add(new Konva.Rect({
+      x: 220, y: 90, width: 1000, height: 720,
+      cornerRadius: 22, fill: COLORS.room, name: "hint-panel",
+    }));
+    this.hintModal.add(createText({
+      x: 270, y: 150, width: 900, height: 90,
+      text: "Hint", align: "center", fontSize: 64,
+      fontFamily: "Gasoek One", fontStyle: "normal", fill: COLORS.gold,
+      listening: false, name: "hint-heading",
+    }));
+    this.hintMessage = createText({
+      x: 280, y: 295, width: 880, height: 300,
+      align: "center", verticalAlign: "middle", fontSize: 39,
+      lineHeight: 1.25, fill: COLORS.purple, listening: false,
+      name: "hint-message",
+    });
+    this.hintModal.add(this.hintMessage);
+    const backButton = createButton({
+      x: 410, y: 667, width: 620, height: 90,
+      label: "Back to Problem", fontSize: 39, name: "hint-back",
+      onClick: () => {
+        this.hintModal.hide();
+        this.layer.batchDraw();
+      },
+    });
+    // Figma uses a green face for the primary action.
+    backButton.findOne<Konva.Rect>(".face")?.fill(COLORS.green);
+    this.hintModal.add(backButton);
+    this.layer.add(this.hintModal);
+
     // App-scoped, like the screen itself, so these are never unsubscribed.
     notifications.subscribe(EventType.Correct, () => this.showFeedback("Correct!", COLORS.green));
     notifications.subscribe(EventType.Incorrect, () =>
@@ -73,10 +121,13 @@ export class RoomScreen implements RoomScreenContract {
    * Shows the Room and builds a fresh puzzle from the Question, replacing
    * any previous one, so the Room restarts from Step 1.
    */
-  setQuestion(question: Question, roomName: string): void {
+  setQuestion(question: Question, roomName: string, usedHints: number = 0): void {
     this.destroyPuzzle();
     this.clearFeedback();
     this.roomName.text(roomName);
+    this.activeQuestion = question;
+    this.usedHints = Math.max(0, Math.min(MAX_HINTS_PER_ROOM, usedHints));
+    this.hintModal.hide();
 
     const puzzle = new BasicMultistepPuzzle(question.prompt, {
       layer: this.layer,
@@ -106,6 +157,34 @@ export class RoomScreen implements RoomScreenContract {
     return this.exits.add(cb);
   }
 
+  onHint(cb: () => void): Unsubscribe {
+    return this.hints.add(cb);
+  }
+
+  private requestHint(): void {
+    if (!this.activeQuestion || this.hintModal.visible()) return;
+    if (this.usedHints >= MAX_HINTS_PER_ROOM) {
+      this.hintMessage.text("You have used both hints for this room. Keep trying!");
+    } else {
+      this.usedHints += 1;
+      this.hints.emit();
+      this.hintMessage.text(this.generateHint(this.activeQuestion, this.usedHints));
+    }
+    this.hintModal.show();
+    this.hintModal.moveToTop();
+    this.layer.batchDraw();
+  }
+
+  private generateHint(question: Question, hintNumber: number): string {
+    const expression = question.prompt;
+    if (hintNumber === 1) {
+      const division = expression.match(/x\\s*\\/\\s*(\\d+)/i);
+      if (division) return `${expression}\\n\\nTo isolate x, try multiplying both sides by ${division[1]}.`;
+      return `${expression}\\n\\nStart by getting the x terms on one side and the numbers on the other. Do the same operation to both sides.`;
+    }
+    return `${expression}\\n\\nUndo any multiplication or division around x, then substitute your answer back into the original equation to check it.`;
+  }
+
   show(): void {
     this.layer.show();
     this.layer.batchDraw();
@@ -115,6 +194,8 @@ export class RoomScreen implements RoomScreenContract {
   hide(): void {
     this.destroyPuzzle();
     this.clearFeedback();
+    this.activeQuestion = null;
+    this.hintModal.hide();
     this.layer.hide();
   }
 
