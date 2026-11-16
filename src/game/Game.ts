@@ -3,6 +3,7 @@ import { EventType } from "../notification-manager/GameEvent";
 import { getQuestion } from "../questions/QuestionGenerator";
 import type { StepAnswer } from "../questions/Question";
 import { ScoreController, ScoreModel } from "../score";
+import { MAX_HINTS_PER_ROOM } from "../score/ScoreModel";
 import type { Difficulty, ScoreSnapshot } from "../score";
 import { MapController } from "../map/MapController";
 import type { SwitchMapScreen } from "../map/MapController";
@@ -63,6 +64,7 @@ export class Game {
   private readonly rooms: Room[];
   private readonly map: MapController;
   private readonly history = new AnswerHistory();
+  private readonly hintsByRoom = new Map<string, number>();
   private readonly validator: AnswerValidator;
 
   /** Unsubscribers for everything Game registered on longer-lived objects. */
@@ -126,6 +128,7 @@ export class Game {
         if (!this.ended) this.map.returnToMap(); // map sends ReturnedToMap → clock pauses
       }),
       this.roomScreen.onAnswer((answer) => this.handleAnswer(answer)),
+      ...(this.roomScreen.onHint ? [this.roomScreen.onHint(() => this.handleHint())] : []),
     );
 
     // Map → screens.
@@ -158,13 +161,22 @@ export class Game {
   private handleScreenChange(event: SwitchMapScreen): void {
     if (this.ended) return;
     if (event.room) {
-      this.roomScreen.setQuestion(event.room.question, event.room.name);
+      this.roomScreen.setQuestion(event.room.question, event.room.name, this.hintsByRoom.get(event.room.id) ?? 0);
       this.updateHud();
       this.screens.show("room");
     } else if (event.screen === "map") {
       this.mapScreen.setRooms(this.rooms, this.map.solvedRooms);
       this.screens.show("map");
     }
+  }
+
+  private handleHint(): void {
+    const room = this.map.activeRoom;
+    if (this.ended || !room) return;
+    const used = this.hintsByRoom.get(room.id) ?? 0;
+    if (used >= MAX_HINTS_PER_ROOM) return;
+    this.hintsByRoom.set(room.id, used + 1);
+    this.notifications.send({ eventType: EventType.HintUsed, roomId: room.id });
   }
 
   private handleAnswer(answer: StepAnswer): void {
@@ -177,7 +189,7 @@ export class Game {
     this.answering = true;
     let correct: boolean;
     try {
-      correct = this.validator.validateAnswer(room.question, answer, room.kind);
+      correct = this.validator.validateAnswer(room.question, answer, room.kind, room.id);
     } finally {
       this.answering = false;
     }
