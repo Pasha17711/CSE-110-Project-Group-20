@@ -8,6 +8,7 @@ export const created: FakePuzzle[] = [];
 
 export class FakePuzzle {
   destroyed = false;
+  interactionEnabled = true;
   onAnswer?: (answer: StepAnswer) => void;
   onPuzzleFinished?: (solved: boolean) => void;
 
@@ -17,6 +18,10 @@ export class FakePuzzle {
 
   destroy(): void {
     this.destroyed = true;
+  }
+
+  setInteractionEnabled(enabled: boolean): void {
+    this.interactionEnabled = enabled;
   }
 
   /** Simulates the player answering a Step. */
