@@ -8,10 +8,10 @@ import { DESIGN_WIDTH, fitLayer } from "./layout";
 import { Listeners } from "./listeners";
 import { COLORS, createBackground, createButton, createText } from "./theme";
 
-const STATS = { x: 120, y: 230, width: 560, rowHeight: 48 };
-const BOARD = { x: 760, y: 230, width: 560, rowHeight: 40 };
+const STATS = { x: 150, y: 286, width: 485, rowHeight: 46 };
+const BOARD = { x: 755, y: 286, width: 500, rowHeight: 36 };
 /** The name box's TextInput, centered at (x, y), under the stats column. */
-const NAME_BOX = { x: STATS.x + 150, y: 660, width: 300, height: 50 };
+const NAME_BOX = { x: STATS.x + 120, y: 731, width: 300, height: 50 };
 
 /**
  * Shown after a Heist ends: the outcome, the results, the leaderboard for
@@ -43,10 +43,28 @@ export class EndScreen implements EndScreenContract {
     fitLayer(this.layer, stageWidth, stageHeight);
     this.layer.add(createBackground());
 
+    // Match the navy, pale gray panels and purple type of the team's Figma mockups.
+    this.layer.add(new Konva.Rect({
+      x: 92, y: 205, width: 1256, height: 585,
+      fill: COLORS.room, cornerRadius: 20, name: "results-panel",
+      listening: false,
+    }));
+    this.layer.add(new Konva.Rect({
+      x: 127, y: 260, width: 555, height: 440,
+      fill: COLORS.white, stroke: COLORS.purple, strokeWidth: 3,
+      cornerRadius: 16, listening: false,
+    }));
+    this.layer.add(new Konva.Rect({
+      x: 720, y: 260, width: 580, height: 440,
+      fill: COLORS.white, stroke: COLORS.purple, strokeWidth: 3,
+      cornerRadius: 16, listening: false,
+    }));
+
     this.outcome = createText({
-      y: 60, width: DESIGN_WIDTH,
+      y: 55, width: DESIGN_WIDTH,
       align: "center",
       fontSize: 80,
+      fontFamily: "Gasoek One", fontStyle: "normal",
       name: "outcome",
     });
     this.layer.add(this.outcome);
@@ -68,8 +86,8 @@ export class EndScreen implements EndScreenContract {
 
     this.boardTitle = createText({
       x: BOARD.x, y: BOARD.y, width: BOARD.width,
-      fontSize: 32,
-      fill: COLORS.gold,
+      fontSize: 31,
+      fill: COLORS.purple,
     });
     this.boardRows.position({ x: BOARD.x, y: BOARD.y + 56 });
     this.layer.add(this.boardTitle, this.boardRows);
@@ -78,7 +96,7 @@ export class EndScreen implements EndScreenContract {
     this.nameBox.add(createText({
       x: STATS.x, y: NAME_BOX.y - 70, width: STATS.width,
       text: "Enter your name to save your score",
-      fontSize: 24,
+      fontSize: 24, fill: COLORS.purple,
     }));
     this.nameBox.add(createButton({
       x: NAME_BOX.x + NAME_BOX.width / 2 + 24, y: NAME_BOX.y - NAME_BOX.height / 2 + 2,
@@ -91,7 +109,7 @@ export class EndScreen implements EndScreenContract {
 
     this.saveMessage = createText({
       x: STATS.x, y: NAME_BOX.y - NAME_BOX.height / 2, width: STATS.width + 120,
-      fontSize: 26,
+      fontSize: 25,
       visible: false,
       listening: false,
       name: "save-message",
@@ -111,15 +129,17 @@ export class EndScreen implements EndScreenContract {
     });
     this.nameInput.onTextEntered = (text) => this.submitName(text);
 
-    this.layer.add(createButton({
-      x: DESIGN_WIDTH / 2 - 260, y: 790,
+    const playAgainButton = createButton({
+      x: DESIGN_WIDTH / 2 - 260, y: 815,
       width: 240, height: 56,
       label: "Play Again",
       name: "play-again",
       onClick: () => this.playAgains.emit(),
-    }));
+    });
+    playAgainButton.findOne<Konva.Rect>(".face")?.fill(COLORS.green);
+    this.layer.add(playAgainButton);
     this.layer.add(createButton({
-      x: DESIGN_WIDTH / 2 + 20, y: 790,
+      x: DESIGN_WIDTH / 2 + 20, y: 815,
       width: 240, height: 56,
       label: "Back to Start",
       name: "back-to-start",
@@ -210,8 +230,8 @@ export class EndScreen implements EndScreenContract {
     ];
     rows.forEach(([key, label], i) => {
       const y = STATS.y + i * STATS.rowHeight;
-      this.layer.add(createText({ x: STATS.x, y, width: STATS.width, text: label, fontStyle: "normal" }));
-      const value = createText({ x: STATS.x, y, width: STATS.width, align: "right", name: `stat-${key}` });
+      this.layer.add(createText({ x: STATS.x, y, width: STATS.width, text: label, fontStyle: "normal", fill: COLORS.purple }));
+      const value = createText({ x: STATS.x, y, width: STATS.width, align: "right", fill: COLORS.purple, name: `stat-${key}` });
       this.statValues.set(key, value);
       this.layer.add(value);
     });
@@ -224,16 +244,16 @@ export class EndScreen implements EndScreenContract {
   private renderLeaderboard(entries: LeaderboardEntry[]): void {
     this.boardRows.destroyChildren();
     if (entries.length === 0) {
-      this.boardRows.add(createText({ width: BOARD.width, text: "No saved scores yet.", fontStyle: "normal" }));
+      this.boardRows.add(createText({ width: BOARD.width, text: "No saved scores yet.", fontStyle: "normal", fill: COLORS.purple }));
       return;
     }
     entries.forEach((entry, i) => {
       const y = i * BOARD.rowHeight;
       const row = new Konva.Group({ y, name: "leaderboard-row" });
-      row.add(createText({ width: 48, text: `${i + 1}.`, fontStyle: "normal" }));
-      row.add(createText({ x: 48, width: 280, text: entry.playerName, fontStyle: "normal", ellipsis: true, wrap: "none" }));
-      row.add(createText({ x: 328, width: 120, text: entry.score.toLocaleString("en-US"), align: "right" }));
-      row.add(createText({ x: 448, width: 112, text: formatTime(entry.timeSpentMs), align: "right", fontStyle: "normal" }));
+      row.add(createText({ width: 48, text: `${i + 1}.`, fontStyle: "normal", fill: COLORS.purple }));
+      row.add(createText({ x: 48, width: 280, text: entry.playerName, fontStyle: "normal", fill: COLORS.purple, ellipsis: true, wrap: "none" }));
+      row.add(createText({ x: 328, width: 120, text: entry.score.toLocaleString("en-US"), align: "right", fill: COLORS.purple }));
+      row.add(createText({ x: 448, width: 112, text: formatTime(entry.timeSpentMs), align: "right", fontStyle: "normal", fill: COLORS.purple }));
       this.boardRows.add(row);
     });
   }
