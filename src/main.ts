@@ -30,7 +30,6 @@ const stage = new Konva.Stage({
 const notifications = new NotificationManager();
 // One app-scoped subscriber; all sounds react to the same events as the score/HUD.
 const audio = new AudioManager(notifications);
-void audio;
 const leaderboard = new Leaderboard();
 const screens = new ScreenController(stage);
 
@@ -62,6 +61,7 @@ function startHeist(difficulty: Difficulty): void {
 }
 
 startScreen.onStart((difficulty) => startHeist(difficulty));
+startScreen.onAudioMuteChange((muted) => audio.setMuted(muted));
 
 notifications.subscribe(EventType.GameOver, () => {
   if (!game) return;
