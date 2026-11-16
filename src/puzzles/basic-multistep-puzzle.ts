@@ -148,6 +148,11 @@ class BasicMultistepPuzzle {
   }
 
   /** Removes the puzzle from its layer, including the text input's HTML element. */
+  public setInteractionEnabled(enabled: boolean): void {
+    if (enabled) this.input.enable()
+    else this.input.disable()
+  }
+
   public destroy(): void {
     this.onAnswer = undefined
     this.onPuzzleFinished = undefined
