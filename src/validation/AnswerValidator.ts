@@ -26,7 +26,9 @@ export class AnswerValidator {
         const isCorrect = answer.playerAnswer.trim() === answer.correctAnswer.trim();
 
         if (isCorrect && answer.isLastStep) {
-            this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind, roomId });
+            this.notifications.send(roomId
+                ? { eventType: EventType.RoomSolved, roomKind: kind, roomId }
+                : { eventType: EventType.RoomSolved, roomKind: kind });
         }
 
         this.notifications.send({
