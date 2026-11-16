@@ -178,11 +178,11 @@ export class RoomScreen implements RoomScreenContract {
   private generateHint(question: Question, hintNumber: number): string {
     const expression = question.prompt;
     if (hintNumber === 1) {
-      const division = expression.match(/x\\s*\\/\\s*(\\d+)/i);
-      if (division) return `${expression}\\n\\nTo isolate x, try multiplying both sides by ${division[1]}.`;
-      return `${expression}\\n\\nStart by getting the x terms on one side and the numbers on the other. Do the same operation to both sides.`;
+      const division = expression.match(/x\s*\/\s*(\d+)/i);
+      if (division) return `${expression}\n\nTo isolate x, try multiplying both sides by ${division[1]}.`;
+      return `${expression}\n\nStart by getting the x terms on one side and the numbers on the other. Do the same operation to both sides.`;
     }
-    return `${expression}\\n\\nUndo any multiplication or division around x, then substitute your answer back into the original equation to check it.`;
+    return `${expression}\n\nUndo any multiplication or division around x, then substitute your answer back into the original equation to check it.`;
   }
 
   show(): void {
