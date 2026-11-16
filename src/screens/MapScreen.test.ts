@@ -27,7 +27,7 @@ function createEasyGrid(rooms: Room[]): MapGrid {
   grid.placeRoom(roomA, 0, 0, 1, 1);
   grid.placeRoom(roomB, 0, 1, 1, 1);
   grid.placeRoom(vault, 0, 2, 1, 2); // 2 rows tall
-  grid.placeRoom(roomC, 2, 0, 2, 1); // 2 columns wide
+  grid.placeRoom(roomC, 2, 0, 2, 1, { visualColSpan: 1.5 });
   grid.placeRoom(roomX, 2, 2, 1, 1);
   return grid;
 }
@@ -38,6 +38,12 @@ describe("MapScreen", () => {
   function button(id: string): Konva.Group {
     const node = screen.layer.findOne<Konva.Group>(`.room-button-${id}`);
     if (!node) throw new Error(`no button for ${id}`);
+    return node;
+  }
+
+  function floor(id: string): Konva.Rect {
+    const node = screen.layer.findOne<Konva.Rect>(`.floor-${id}`);
+    if (!node) throw new Error(`no floor for ${id}`);
     return node;
   }
 
@@ -68,6 +74,33 @@ describe("MapScreen", () => {
     expect(button("room_a").findOne(".solved-label")).toBeDefined();
     expect(screen.layer.find(".lock")).toHaveLength(2);
   });
+
+  it("sizes rooms using visualColSpan/visualRowSpan and centers the button inside visual bounds", () => {
+      const rooms = createRooms();
+      const grid = createEasyGrid(rooms);
+
+      screen.setGrid(grid, new Set());
+
+      // 3x3 grid inside GRID_AREA (width: 1207, height: 737, gap: 16)
+      // tileWidth = Math.floor((1207 - 32) / 3) = 391
+      // tileHeight = Math.floor((737 - 32) / 3) = 235
+      const tileWidth = Math.floor((1207 - 2 * 16) / 3);
+      const tileHeight = Math.floor((737 - 2 * 16) / 3);
+
+      // Room C has colSpan: 2, visualColSpan: 1.5
+      const roomCFloor = floor("room_c");
+      const expectedCWidth = 1.5 * tileWidth + (1.5 - 1) * 16;
+      expect(roomCFloor.width()).toBe(expectedCWidth);
+
+      const roomCButton = button("room_c");
+      const expectedCButtonX = roomCFloor.x() + (expectedCWidth - 191) / 2;
+      expect(roomCButton.x()).toBe(expectedCButtonX);
+
+      // Vault has rowSpan: 2 and no visual override -> uses full 2-row height
+      const vaultFloor = floor("vault");
+      const expectedVaultHeight = 2 * tileHeight + 16;
+      expect(vaultFloor.height()).toBe(expectedVaultHeight);
+    });
 
   it("redraws from scratch on each setGrid call", () => {
       const rooms = createRooms();

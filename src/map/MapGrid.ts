@@ -6,6 +6,10 @@ export interface PlacedRoom {
     column: number;
     colSpan: number;
     rowSpan: number;
+    // Optional visual width multiplier (defaults to colSpan)
+    visualColSpan?: number;
+    // Optional visual height multiplier (defaults to rowSpan)
+    visualRowSpan?: number;
 }
 
 export class MapGrid {
@@ -27,8 +31,8 @@ export class MapGrid {
     }
 
     // Places room at (row, column) on the grid, given that placement is valid
-    public placeRoom(room: Room, row: number, column: number, colSpan: number = 1, rowSpan: number = 1) {
-        if (!this.isValidPlacement(row, column, colSpan, rowSpan)) {
+    public placeRoom(room: Room, row: number, column: number, colSpan: number = 1, rowSpan: number = 1, visualOptions?: { visualColSpan?: number; visualRowSpan?: number }) {
+        if (!this.isValidPlacement(row, column, colSpan, rowSpan, visualOptions)) {
             throw new Error("Invalid room placement");
         }
         for (let i = row; i < row + rowSpan; i++) {
@@ -36,18 +40,25 @@ export class MapGrid {
                 this.tiles[i][j] = room;
             }
         }
-        this.placedRooms.push({ room, row, column, colSpan, rowSpan });
+        this.placedRooms.push({ room, row, column, colSpan, rowSpan, visualColSpan: visualOptions?.visualColSpan, visualRowSpan: visualOptions?.visualRowSpan });
     }
 
     // Checks whether room can be placed at (row, column)
-    public isValidPlacement(row: number, column: number, colSpan: number = 1, rowSpan: number = 1): boolean {
+    public isValidPlacement(row: number, column: number, colSpan: number = 1, rowSpan: number = 1, visualOptions?: { visualColSpan?: number; visualRowSpan?: number }): boolean {
         //make sure row and column are whole numbers 
-        if (!Number.isInteger(row) || !Number.isInteger(column) || colSpan <= 0 || rowSpan <= 0) {
+        if (!Number.isInteger(row) || !Number.isInteger(column) || !Number.isInteger(colSpan) || !Number.isInteger(rowSpan) || colSpan <= 0 || rowSpan <= 0) {
+            return false;
+        }
+
+        const effectiveColSpan = visualOptions?.visualColSpan ?? colSpan;
+        const effectiveRowSpan = visualOptions?.visualRowSpan ?? rowSpan;
+
+        if (effectiveColSpan <= 0 || effectiveRowSpan <= 0) {
             return false;
         }
 
         //check whether coordinates are within grid dimensions
-        if (row < 0 || row + rowSpan > this.rows || column < 0 || column + colSpan > this.columns) {
+        if ( row < 0 || row + rowSpan > this.rows || row + effectiveRowSpan > this.rows || column < 0 || column + colSpan > this.columns || column + effectiveColSpan > this.columns ) {
             return false;
         }
 
@@ -66,7 +77,7 @@ export class MapGrid {
 
     // Retrieves the room at (row, column), returns null if out of bounds
     public getRoomAt(row: number, column: number): Room | null {
-        if (row < 0 || row >= this.rows || column < 0 || column >= this.columns) {
+        if (!Number.isInteger(row) || !Number.isInteger(column) || row < 0 || row >= this.rows || column < 0 || column >= this.columns) {
             return null;
         }
         return this.tiles[row][column];

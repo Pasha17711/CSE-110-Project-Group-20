@@ -67,7 +67,7 @@ export class MapLayout {
         grid.placeRoom(roomA, 0, 0, 1, 1);
         grid.placeRoom(roomB, 0, 1, 1, 1);
         grid.placeRoom(vault, 0, 2, 1, 2);
-        grid.placeRoom(roomC, 2, 0, 1.5, 1);
+        grid.placeRoom(roomC, 2, 0, 2, 1, {visualColSpan: 1.5});
         grid.placeRoom(roomX, 2, 2, 1, 1);
 
         return {grid, rooms: [roomA, roomB, roomC, roomX, vault]};
@@ -119,11 +119,11 @@ export class MapLayout {
             kind: "bonus",
         });
 
-        grid.placeRoom(roomA, 0, 0, 1, 1.3);
-        grid.placeRoom(roomB, 0, 1, 0.9, 1.3);
+        grid.placeRoom(roomA, 0, 0, 1, 2, {visualRowSpan: 1.3});
+        grid.placeRoom(roomB, 0, 1, 1, 2, {visualColSpan: 0.9, visualRowSpan: 1.3});
         grid.placeRoom(vault, 0, 2, 1, 2);
         grid.placeRoom(roomC, 2, 0);
-        grid.placeRoom(roomD, 2, 1, 0.9, 1);
+        grid.placeRoom(roomD, 2, 1, 1, 1, {visualColSpan: 0.9});
         grid.placeRoom(roomX, 2, 2);
 
         return {grid, rooms: [roomA, roomB, roomC, roomD, roomX, vault]};
@@ -189,13 +189,13 @@ export class MapLayout {
             kind: "bonus",
         });
 
-        grid.placeRoom(roomB, 0, 0, 0.9, 1);
+        grid.placeRoom(roomB, 0, 0, 1, 1, {visualColSpan: 0.9});
         grid.placeRoom(roomC, 0, 1);
         grid.placeRoom(roomD, 0, 2);
         grid.placeRoom(vault, 0, 3, 1, 2);
-        grid.placeRoom(roomA, 1, 0, 0.9, 1);
-        grid.placeRoom(roomY, 2, 0, 0.9, 1);
-        grid.placeRoom(roomE, 2, 1, 1.5, 1);
+        grid.placeRoom(roomA, 1, 0, 1, 1, {visualColSpan: 0.9});
+        grid.placeRoom(roomY, 2, 0, 1, 1, {visualColSpan: 0.9});
+        grid.placeRoom(roomE, 2, 1, 2, 1, {visualColSpan: 1.5});
         grid.placeRoom(roomX, 2, 3);
 
         return {grid, rooms: [roomA, roomB, roomC, roomD, roomE, roomX, roomY, vault]};

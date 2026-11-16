@@ -109,12 +109,15 @@ export class MapScreen implements MapScreenContract {
 
     const placedRooms = grid.getAllRooms();
 
-    for (const { room, row, column, colSpan, rowSpan } of placedRooms) {
+    for (const { room, row, column, colSpan, rowSpan, visualColSpan, visualRowSpan } of placedRooms) {
+      const effectiveColSpan = visualColSpan ?? colSpan;
+      const effectiveRowSpan = visualRowSpan ?? rowSpan;
+
       const rx = GRID_AREA.x + column * (tileWidth + GRID_AREA.gap);
       const ry = GRID_AREA.y + row * (tileHeight + GRID_AREA.gap);
 
-      const roomWidth = colSpan * tileWidth + (colSpan - 1) * GRID_AREA.gap;
-      const roomHeight = rowSpan * tileHeight + (rowSpan - 1) * GRID_AREA.gap;
+      const roomWidth = effectiveColSpan * tileWidth + (effectiveColSpan - 1) * GRID_AREA.gap;
+      const roomHeight = effectiveRowSpan * tileHeight + (effectiveRowSpan - 1) * GRID_AREA.gap;
 
       // Centered button inside tile bounds
       const bx = rx + Math.max(0, (roomWidth - BUTTON.width) / 2);
