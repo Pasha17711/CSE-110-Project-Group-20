@@ -10,7 +10,7 @@ describe("AudioManager", () => {
     expect(audio.isMuted()).toBe(false);
     audio.setMuted(true);
     expect(audio.isMuted()).toBe(true);
-    for (const eventType of [EventType.Correct, EventType.Incorrect, EventType.GameOver]) {
+    for (const eventType of [EventType.Correct, EventType.Incorrect, EventType.GameOver] as const) {
       expect(() => manager.send({ eventType })).not.toThrow();
     }
     expect(() => manager.send({ eventType: EventType.RoomSolved, roomKind: "main" })).not.toThrow();
