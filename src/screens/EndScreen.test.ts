@@ -322,7 +322,7 @@ describe("EndScreen", () => {
     expect(find("review-modal").visible()).toBe(false);
     });
 
-    //Test 3: Displayes question and Answer
+    //Test 3: Display question and first incorrect answer attempt
     it("displays the question, player answer, and correct answer", () => {
     const question = {
         prompt: "3x + 2 = 17",
@@ -334,14 +334,18 @@ describe("EndScreen", () => {
     const texts = visibleTexts(screen.layer);
 
     expect(texts).toContain("3x + 2 = 17");
-    expect(texts).toContain("Your answer: 4");
-    expect(texts).toContain("Correct answer: 5");
+    expect(texts).toContain("Your attempt: 4");
+    expect(texts).toContain("Expected: 5");
     expect(texts).toContain("Question 1 of 1");
-    expect(texts).toContain("Incorrect");
+    expect(texts).toContain("Not solved");
+
+    //check one mistake card was created
+    expect((find("review-mistakes") as Konva.Group).getChildren()
+    ).toHaveLength(1);    
     });
 
     //Test 4: Display correct status
-    it("shows Correct! for a correct answer", () => {
+    it("shows Solved for a correctly answered question", () => {
     const question = {
         prompt: "6 + 2 = ?",
         answer: "8"
@@ -351,12 +355,18 @@ describe("EndScreen", () => {
 
     const texts = visibleTexts(screen.layer);
 
-    expect(texts).toContain("Correct!");
-    expect(texts).not.toContain("Incorrect");
+    
+    expect(texts).toContain("Solved");
+    expect(texts).toContain("No incorrect attempts!");
+    expect(texts).toContain("Question 1 of 1");
+
+    //no mistake cards should be created
+    expect((find("review-mistakes") as Konva.Group).getChildren()
+    ).toHaveLength(0);    
     });
 
-    //Test 5: Incorrect questions shoud display first
-    it("displays incorrect questions before correct questions", () => {
+    //Test 5: Verify questions display in order and update their status
+    it("displays incorrect questions in order with their correct status", () => {
     const correctQuestion = {
         prompt: "2 + 6 = ?",
         answer: "8"
@@ -372,14 +382,30 @@ describe("EndScreen", () => {
         answer(incorrectQuestion, "12", false)
     ]);
 
-    // incorrect question should display first
-    expect(visibleTexts(screen.layer)).toContain("5 x 3 = ?");
-    expect(visibleTexts(screen.layer)).toContain("Incorrect");
+    // first question was solved correctly
+        let texts = visibleTexts(screen.layer);
 
-    find("review-next").fire("click");
+        expect(texts).toContain("2 + 6 = ?");
+        expect(texts).toContain("Solved");
+        expect(texts).toContain("Question 1 of 2");
 
-    expect(visibleTexts(screen.layer)).toContain("2 + 6 = ?");
-    expect(visibleTexts(screen.layer)).toContain("Correct!");   
+        expect(
+            (find("review-mistakes") as Konva.Group).getChildren()
+        ).toHaveLength(0);
+
+        // navigate to the incorrect question
+        find("review-next").fire("click");
+
+        texts = visibleTexts(screen.layer);
+
+        expect(texts).toContain("5 x 3 = ?");
+        expect(texts).toContain("Not solved");
+        expect(texts).toContain("Your attempt: 12");
+        expect(texts).toContain("Expected: 15");
+        expect(texts).toContain("Question 2 of 2");
+
+        expect((find("review-mistakes") as Konva.Group).getChildren()
+        ).toHaveLength(1); 
     });
 
     //Test 6: Next and Previous Buttons
@@ -431,32 +457,36 @@ describe("EndScreen", () => {
     expect(visibleTexts(screen.layer)).toContain("2 + 2 = ?");
 });
 
-//Test 8: Intermediate steps shouldn't be displayed
-it("only displays final-step answers", () => {
-    const intermediate = {
-        prompt: "Intermediate question",
-        answer: "2"
-    };
-
-    const finalQuestion = {
-        prompt: "Final question",
-        answer: "5"
+//Test 8: Intermediate steps should be displayed even if question is solved
+it("tracks intermediate mistakes when final answer is correct", () => {
+    const question = {
+      prompt: "3x + 2 = 17",
+      answer: "5"
     };
 
     openReview([
-        answer(intermediate, "2", true, false),
-        answer(finalQuestion, "5", true, true)
+      answer(question, "4", false, false),
+      answer(question, "5", true, false),
+      answer(question, "5", true, true)
     ]);
 
-    const texts = visibleTexts(screen.layer);
+  const texts = visibleTexts(screen.layer);
 
-    expect(texts).toContain("Final question");
-    expect(texts).not.toContain("Intermediate question");
-    expect(texts).toContain("Question 1 of 1");
+  expect(texts).toContain("3x + 2 = 17");
+  expect(texts).toContain("Solved with mistakes");
+  expect(texts).toContain("Question 1 of 1");
+
+  // earlier mistake should still be visible
+  expect(texts).toContain("Your attempt: 4");
+  expect(texts).toContain("Expected: 5");
+  expect(texts).toContain("Total incorrect attempts: 1");
+
+  expect((find("review-mistakes") as Konva.Group).getChildren()
+  ).toHaveLength(1);
 });
 
-//Test 9: No Duplicate submissions
-it("keeps only the latest final submission for a question", () => {
+//Test 9: Repeated incorrect attempts should be grouped into one card
+it("groups repeated mistakes for same step", () => {
     const question = {
         prompt: "3x + 2 = 17",
         answer: "5"
@@ -464,15 +494,26 @@ it("keeps only the latest final submission for a question", () => {
 
     openReview([
         answer(question, "4", false),
+        answer(question, "3", false),
         answer(question, "5", true)
     ]);
 
     const texts = visibleTexts(screen.layer);
 
     expect(texts).toContain("Question 1 of 1");
-    expect(texts).toContain("Your answer: 5");
-    expect(texts).toContain("Correct!");
-    expect(texts).not.toContain("Your answer: 4");
+    expect(texts).toContain("Solved with mistakes");
+
+    //verify only first incorrect attempt is displayed
+    expect(texts).toContain("Your attempt: 4");
+    expect(texts).not.toContain("Your attempt: 3");
+    expect(texts).toContain("Expected: 5");
+
+    // Both incorrect submissions should be counted
+    expect(texts).toContain("Total incorrect attempts: 2");
+
+    // Only one card because both mistakes occurred on Step 1
+    expect((find("review-mistakes") as Konva.Group).getChildren()
+    ).toHaveLength(1);
 });
 
 //Test 10: Empty History
