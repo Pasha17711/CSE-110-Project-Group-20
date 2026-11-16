@@ -103,6 +103,7 @@ export class RoomScreen implements RoomScreenContract {
       label: "Back to Problem", fontSize: 39, name: "hint-back",
       onClick: () => {
         this.hintModal.hide();
+        this.puzzle?.setInteractionEnabled(true);
         this.layer.batchDraw();
       },
     });
@@ -170,6 +171,7 @@ export class RoomScreen implements RoomScreenContract {
       this.hints.emit();
       this.hintMessage.text(this.generateHint(this.activeQuestion, this.usedHints));
     }
+    this.puzzle?.setInteractionEnabled(false);
     this.hintModal.show();
     this.hintModal.moveToTop();
     this.layer.batchDraw();
