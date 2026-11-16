@@ -344,6 +344,7 @@ class MultistepSolverModel {
         }
 
         const nextValue = this.parseFraction(next.term);
+        if (!next.positive) nextValue.numerator *= -1;
         if (next.constant) {
           coefficient = operation === '*'
             ? this.multiplyFractions(coefficient, nextValue)
