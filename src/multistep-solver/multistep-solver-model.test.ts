@@ -118,6 +118,46 @@ describe('MultistepSolverModel', () => {
       expect(model.arithmeticProblems()).toEqual([])
     })
 
+    // A constant after `/` is a divisor, so the next factor folds into it with
+    // the opposite operator: x / a / b = x / (a * b) and x / a * b = x / (a / b).
+    it.each<[string, Term[], string, Term[]]>([
+      [
+        'x / 2 / (-4)',
+        [variableTerm('x', true), '/', numberTerm('2'), '/', numberTerm('4', false)],
+        '-8',
+        [variableTerm('x', true), '/', numberTerm('8', false)],
+      ],
+      [
+        'x / 2 * 4',
+        [variableTerm('x', true), '/', numberTerm('2'), '*', numberTerm('4')],
+        '1/2',
+        [variableTerm('x', true), '/', numberTerm('1/2')],
+      ],
+    ])('folds constants that follow a division in %s', (_name, right, answer, expected) => {
+      const model = new MultistepSolverModel()
+      addSide(model, [variableTerm('y', true)], right)
+
+      expect(model.arithmeticProblems().map(([, a]) => a)).toEqual([answer])
+      model.solve()
+
+      expect(model.getRightSide()).toEqual(expected)
+    })
+
+    it('folds a divisor chain of constants to the same value from either end', () => {
+      const fromStart = new MultistepSolverModel()
+      addSide(fromStart, [variableTerm('y', true)], [numberTerm('12'), '/', numberTerm('4'), '/', numberTerm('2')])
+      fromStart.solve(0)
+      fromStart.solve(0)
+
+      const fromEnd = new MultistepSolverModel()
+      addSide(fromEnd, [variableTerm('y', true)], [numberTerm('12'), '/', numberTerm('4'), '/', numberTerm('2')])
+      fromEnd.solve(1)
+      fromEnd.solve(0)
+
+      expect(fromStart.getRightSide()).toEqual([numberTerm('3/2')])
+      expect(fromEnd.getRightSide()).toEqual([numberTerm('3/2')])
+    })
+
     it('solves like-variable problems', () => {
       const model = new MultistepSolverModel()
       addSide(model,
