@@ -6,6 +6,7 @@ vi.mock("../puzzles/basic-multistep-puzzle", () => import("./testing/fakePuzzle"
 import { RoomScreen } from "./RoomScreen";
 import { NotificationManager } from "../notification-manager/NotificationManager";
 import type Konva from "konva";
+import { created } from "./testing/fakePuzzle";
 
 const question = { prompt: "x / 3 = 5", answer: "15" };
 
@@ -30,10 +31,12 @@ describe("RoomScreen hint modal", () => {
     screen.onHint(requested);
     clickHint();
     expect(screen.layer.findOne(".hint-modal")!.visible()).toBe(true);
+    expect(created[created.length - 1].interactionEnabled).toBe(false);
     expect((screen.layer.findOne(".hint-message")! as Konva.Text).text()).toContain("multiply");
     expect(requested).toHaveBeenCalledOnce();
     closeHint();
     expect(screen.layer.findOne(".hint-modal")!.visible()).toBe(false);
+    expect(created[created.length - 1].interactionEnabled).toBe(true);
   });
 
   it("limits hints to two, including after re-entering a room", () => {
