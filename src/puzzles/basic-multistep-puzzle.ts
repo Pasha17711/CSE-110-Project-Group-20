@@ -35,7 +35,7 @@ class BasicMultistepPuzzle {
   private readonly view: MultistepSolverView
   private readonly controller: MultistepSolverController
   private readonly actionMenu: ActionMenu
-  private readonly input: TextInput
+  private readonly textInput: TextInput
   private readonly keypad: KeypadInput
   private keypadAnswer = ''
 
@@ -69,7 +69,7 @@ class BasicMultistepPuzzle {
       options.actionMenuWidth ?? 64,
       options.actionMenuHeight ?? 64,
     )
-    this.input = new TextInput({
+    this.textInput = new TextInput({
       layer: options.layer,
       x: 0,
       y: 0,
@@ -158,27 +158,27 @@ class BasicMultistepPuzzle {
     this.actionMenu.onMultiplicationClicked = () => this.moveRequest('*')
     this.actionMenu.onDivisionClicked = () => this.moveRequest('/')
 
-    this.input.onTextFocused = () => {
-      this.input.outlineColor('#77aaff')
+    this.textInput.onTextFocused = () => {
+      this.textInput.outlineColor('#77aaff')
     }
-    this.input.onTextEntered = text => {
-      this.input.outlineColor('#aabbbb')
+    this.textInput.onTextEntered = text => {
+      this.textInput.outlineColor('#aabbbb')
       const answer = text.trim()
       if (answer === '') return // an empty box (e.g. on blur) isn't an Answer
       this.controller.arithmetic(answer)
     }
 
     this.controller.onAnswerSubmit = (_question, playerAnswer, correctAnswer, isLastStep) => {
-      this.input.clear()
+      this.textInput.clear()
       this.keypadAnswer = ''
-      this.keypad.setAnswer('')
+      this.keypad.setAnswer()
       if (playerAnswer === correctAnswer) this.controller.step()
       this.onAnswer?.({ playerAnswer, correctAnswer, isLastStep })
     }
 
     this.controller.onStateChange = state => {
       if (state === 'Operation') {
-        this.input.hide()
+        this.textInput.hide()
         this.keypad.hide()
         this.actionMenu.show(this.actionMenuX(), this.options.y)
         return
@@ -188,7 +188,7 @@ class BasicMultistepPuzzle {
         this.actionMenu.hide()
         
         if (this.options.inputType === "keypad") {
-        this.input.hide()
+        this.textInput.hide()
 
         this.keypad.position({
             x: this.options.x + this.options.width / 2 - 260,
@@ -200,8 +200,8 @@ class BasicMultistepPuzzle {
 
         }else{
           this.keypad.hide();
-          this.input.show(this.options.x, this.inputY())
-          this.input.outlineColor('#aabbbb')
+          this.textInput.show(this.options.x, this.inputY())
+          this.textInput.outlineColor('#aabbbb')
         }
         return
       }
@@ -221,7 +221,7 @@ class BasicMultistepPuzzle {
     this.controller.onStateChange = undefined
     this.view.destroy()
     this.actionMenu.destroy()
-    this.input.destroy()
+    this.textInput.destroy()
     this.keypad.destroy();
   }
 
@@ -243,7 +243,7 @@ class BasicMultistepPuzzle {
 
   private hideExternalControls(): void {
     this.actionMenu.hide()
-    this.input.hide()
+    this.textInput.hide()
     this.keypad.hide()
   }
 }

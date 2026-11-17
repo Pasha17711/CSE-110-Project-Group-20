@@ -133,9 +133,8 @@ export default class KeypadInput extends Konva.Group {
         this.add(submitButton);
     }
 
-    public setAnswer(answer: string): void {
-    this.answerDisplay.text(answer || "Enter answer");
-    this.getLayer()?.batchDraw();
-
-}
+    public setAnswer(answer?: string): void {
+        this.answerDisplay.text(answer || "Enter answer");
+        this.getLayer()?.batchDraw();
+    }
 }   
