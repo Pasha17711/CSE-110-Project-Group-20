@@ -16,6 +16,7 @@ export class FakePuzzle {
   /** Which puzzle this stands in for (a RoomPuzzle type). */
   type = "multistep";
   destroyed = false;
+  interactionEnabled = true;
   onAnswer?: (answer: StepAnswer) => void;
   onPuzzleFinished?: (solved: boolean) => void;
 
@@ -29,6 +30,10 @@ export class FakePuzzle {
 
   destroy(): void {
     this.destroyed = true;
+  }
+
+  setInteractionEnabled(enabled: boolean): void {
+    this.interactionEnabled = enabled;
   }
 
   /** Simulates the player answering a Step. */

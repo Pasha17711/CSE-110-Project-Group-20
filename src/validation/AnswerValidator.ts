@@ -22,13 +22,14 @@ export class AnswerValidator {
      * Correct Answer that solves the Room (see `solvesRoom`) → RoomSolved, then Correct.
      * Any other correct Answer → Correct only. Returns whether it was correct.
      * `question` is the Question the Answer is recorded under.
+     * `roomId` is required so scoring applies that Room's hint deductions.
      */
     validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind,
-        stepNumber?: number): boolean {
+        roomId: string, stepNumber?: number): boolean {
         const isCorrect = answer.playerAnswer.trim() === answer.correctAnswer.trim();
 
         if (isCorrect && solvesRoom(answer)) {
-            this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind });
+            this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind, roomId });
         }
 
         this.notifications.send({

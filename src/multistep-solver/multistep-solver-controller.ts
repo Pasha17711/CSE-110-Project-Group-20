@@ -129,7 +129,7 @@ class MultistepSolverController {
     const [stepPrompt, correctAnswer] = problems[0]
     const isLastStep = this.isLastArithmeticStep()
     this.arithmeticAnswerAccepted = answer === correctAnswer
-    this.onAnswerSubmit?.(this.equation, answer, correctAnswer, isLastStep, 
+    this.onAnswerSubmit?.(this.equation, answer, correctAnswer, isLastStep,
       stepPrompt)
   }
 

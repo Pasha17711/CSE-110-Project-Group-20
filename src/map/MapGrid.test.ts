@@ -116,19 +116,19 @@ describe('MapGrid Tests', () => {
     expect(() => grid.placeRoom(roomA, -1, 0)).toThrow('Invalid room placement');
     expect(() => grid.placeRoom(roomA, 2, 1)).toThrow('Invalid room placement');
     expect(() => grid.placeRoom(roomA, 0, 2, 2, 1)).toThrow('Invalid room placement'); // col overflow
-  }); 
+  });
 
   test('throws an error when room is placed at an occupied coordinate', () => {
     grid.placeRoom(roomA, 0, 1);
     expect(() => grid.placeRoom(roomA, 0, 1)).toThrow('Invalid room placement');
     expect(() => grid.placeRoom(vault, 0, 0, 2, 1)).toThrow('Invalid room placement'); // collides with (0, 1)
     expect(grid.getRoomAt(0, 1)).toBe(roomA);
-  }); 
+  });
 
   //getRoomAt tests
   test('returns null for unoccupied valid coordinates', () => {
     expect(grid.getRoomAt(0, 0)).toBeNull();
-  }); 
+  });
 
   test('returns null for invalid coordinates', () => {
     expect(grid.getRoomAt(-1, 0)).toBeNull();
@@ -136,19 +136,19 @@ describe('MapGrid Tests', () => {
     expect(grid.getRoomAt(2, 0)).toBeNull();
     expect(grid.getRoomAt(0, 3)).toBeNull();
     expect(grid.getRoomAt(0.5, 1)).toBeNull();
-  }); 
+  });
 
   test('returns the room located at the specified coordinate', () => {
     grid.placeRoom(vault, 0, 2, 1, 2); // 2 rows tall
     expect(grid.getRoomAt(0, 2)).toBe(vault);
     expect(grid.getRoomAt(1, 2)).toBe(vault);
     expect(grid.getRoomAt(2, 2)).toBeNull();
-  }); 
+  });
 
   //getAllRooms tests
   test('returns an empty array when no rooms have been placed', () => {
     expect(grid.getAllRooms()).toEqual([]);
-  }); 
+  });
 
   test('returns all placed rooms with their corresponding coordinates and spans', () => {
     grid.placeRoom(roomA, 0, 0);
@@ -162,7 +162,7 @@ describe('MapGrid Tests', () => {
       { room: roomB, row: 1, column: 0, colSpan: 2, rowSpan: 1, visualColSpan: 1.5, visualRowSpan: undefined },
       { room: vault, row: 0, column: 2, colSpan: 1, rowSpan: 2, visualColSpan: undefined, visualRowSpan: undefined },
     ]);
-  }); 
+  });
 
   //findRoomPosition tests
   test('returns the origin row and column of the specified room', () => {

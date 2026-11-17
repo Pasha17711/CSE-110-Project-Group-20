@@ -33,37 +33,37 @@ describe("AnswerValidator", () => {
     });
 
     it("accepts a correct last Step: RoomSolved for a main Room, then Correct", () => {
-        const result = validator.validateAnswer(question, step("4", "4", true), "main");
+        const result = validator.validateAnswer(question, step("4", "4", true), "main", "room_a");
 
         expect(result).toBe(true);
         expect(sent).toEqual([
-            { eventType: EventType.RoomSolved, roomKind: "main" },
+            { eventType: EventType.RoomSolved, roomKind: "main", roomId: "room_a" },
             { eventType: EventType.Correct },
         ]);
     });
 
     it("solves a Bonus Room with its kind", () => {
-        validator.validateAnswer(question, step("4", "4", true), "bonus");
+        validator.validateAnswer(question, step("4", "4", true), "bonus", "room_x");
 
-        expect(sent[0]).toEqual({ eventType: EventType.RoomSolved, roomKind: "bonus" });
+        expect(sent[0]).toEqual({ eventType: EventType.RoomSolved, roomKind: "bonus", roomId: "room_x" });
     });
 
     it("rejects an incorrect Answer with Incorrect only", () => {
-        const result = validator.validateAnswer(question, step("6", "4", true), "main");
+        const result = validator.validateAnswer(question, step("6", "4", true), "main", "room_a");
 
         expect(result).toBe(false);
         expect(types()).toEqual([EventType.Incorrect]);
     });
 
     it("does not solve the Room on a correct earlier Step", () => {
-        const result = validator.validateAnswer(question, step("-", "-", false), "main");
+        const result = validator.validateAnswer(question, step("-", "-", false), "main", "room_a");
 
         expect(result).toBe(true);
         expect(types()).toEqual([EventType.Correct]);
     });
 
     it("sends Incorrect for a wrong earlier Step, operation picks included", () => {
-        const result = validator.validateAnswer(question, step("+", "-", false), "main");
+        const result = validator.validateAnswer(question, step("+", "-", false), "main", "room_a");
 
         expect(result).toBe(false);
         expect(types()).toEqual([EventType.Incorrect]);
@@ -71,30 +71,30 @@ describe("AnswerValidator", () => {
 
     it("solves the Room only on solvesRoom when a puzzle has several Questions", () => {
         // A Power Box wire: the only Step of its own Question, but not the last wire.
-        validator.validateAnswer(question, { ...step("4", "4", true), solvesRoom: false }, "main");
+        validator.validateAnswer(question, { ...step("4", "4", true), solvesRoom: false }, "main", "room_a");
         expect(types()).toEqual([EventType.Correct]);
 
-        validator.validateAnswer(question, { ...step("4", "4", true), solvesRoom: true }, "main");
+        validator.validateAnswer(question, { ...step("4", "4", true), solvesRoom: true }, "main", "room_a");
         expect(types()).toEqual([EventType.Correct, EventType.RoomSolved, EventType.Correct]);
     });
 
     it("never solves the Room on a wrong Answer, even with solvesRoom", () => {
-        validator.validateAnswer(question, { ...step("5", "4", true), solvesRoom: true }, "main");
+        validator.validateAnswer(question, { ...step("5", "4", true), solvesRoom: true }, "main", "room_a");
 
         expect(types()).toEqual([EventType.Incorrect]);
     });
 
     it("ignores extra whitespace", () => {
-        const result = validator.validateAnswer(question, step(" 4 ", "4", true), "main");
+        const result = validator.validateAnswer(question, step(" 4 ", "4", true), "main", "room_a");
 
         expect(result).toBe(true);
         expect(types()).toEqual([EventType.RoomSolved, EventType.Correct]);
     });
 
     it("records every Answer as an AnswerRecord", () => {
-        validator.validateAnswer(question, step("+", "-", false), "main");
-        validator.validateAnswer(question, step("-", "-", false), "main");
-        validator.validateAnswer(question, step("4", "4", true), "main");
+        validator.validateAnswer(question, step("+", "-", false), "main", "room_a");
+        validator.validateAnswer(question, step("-", "-", false), "main", "room_a");
+        validator.validateAnswer(question, step("4", "4", true), "main", "room_a");
 
         expect(history.getResults()).toEqual([
             { question, playerAnswer: "+", correctAnswer: "-", isCorrect: false, isLastStep: false },

@@ -6,7 +6,9 @@ vi.mock("konva", () => import("../screens/testing/fakeKonva"));
 
 const mocks = vi.hoisted(() => ({
     arithmetic: vi.fn(),
-    step: vi.fn()
+    step: vi.fn(),
+    enable: vi.fn(),
+    disable: vi.fn()
 }));
 
 vi.mock("../text-input/text-input", () => ({
@@ -16,6 +18,8 @@ vi.mock("../text-input/text-input", () => ({
         clear() {}
         outlineColor() {}
         destroy() {}
+        enable = mocks.enable;
+        disable = mocks.disable;
     }
 }));
 
@@ -66,6 +70,7 @@ function createPuzzle() {
     });
 
     return puzzle as unknown as {
+        setInteractionEnabled(enabled: boolean): void;
         keypad: KeypadInput;
         controller: {
             onAnswerSubmit?: (
@@ -82,6 +87,14 @@ describe("BasicMultistepPuzzle keypad", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    it("suspends and restores the text input when hints cover the puzzle", () => {
+        const puzzle = createPuzzle();
+        puzzle.setInteractionEnabled(false);
+        expect(mocks.disable).toHaveBeenCalledOnce();
+        puzzle.setInteractionEnabled(true);
+        expect(mocks.enable).toHaveBeenCalledOnce();
     });
 
     //Test 1: Valid fractions are submitted to solver
@@ -124,8 +137,8 @@ describe("BasicMultistepPuzzle keypad", () => {
 
         expect(mocks.arithmetic).not.toHaveBeenCalled();
     });
-   
-    //Test 4: Clear and backspace delete answer 
+
+    //Test 4: Clear and backspace delete answer
     it("handles clear and backspace correctly", () => {
         const { keypad } = createPuzzle();
 

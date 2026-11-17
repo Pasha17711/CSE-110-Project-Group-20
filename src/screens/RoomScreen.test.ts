@@ -174,7 +174,7 @@ describe("RoomScreen", () => {
 
     random.mockRestore();
    });
-  
+
    //random value above 0.5 selects typed input
   it("selects typed input when random value is above 0.5", () => {
     const random = vi.spyOn(Math, "random").mockReturnValue(0.75);

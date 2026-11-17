@@ -79,6 +79,39 @@ describe("EndScreen", () => {
     expect(nameBoxShown()).toBe(true);
   });
 
+  it.each([[720, 450], [390, 844], [1920, 1080]])(
+    "keeps save, review and replay controls separate and inside a %i by %i stage",
+    (width, height) => {
+      screen = new EndScreen(width, height);
+      screen.setResult(escaped(), []);
+      const save = find("save");
+      const review = find("review-answers");
+      const replay = find("play-again");
+      const back = find("back-to-start");
+      const face = (control: Konva.Node) => (control as Konva.Group).findOne<Konva.Rect>(".face")!;
+      expect(save.x() + face(save).width()).toBeLessThan(review.x());
+      expect(review.y() + face(review).height() + 4).toBeLessThan(replay.y());
+      expect(replay.x() + face(replay).width()).toBeLessThan(back.x());
+      const scale = screen.layer.scale();
+      for (const control of [save, review, replay, back]) {
+        expect(screen.layer.x() + control.x() * scale.x).toBeGreaterThanOrEqual(0);
+        expect(screen.layer.y() + control.y() * scale.y).toBeGreaterThanOrEqual(0);
+        expect(screen.layer.x() + (control.x() + face(control).width()) * scale.x).toBeLessThanOrEqual(width);
+        expect(screen.layer.y() + (control.y() + face(control).height() + 4) * scale.y).toBeLessThanOrEqual(height);
+      }
+    },
+  );
+
+  it("hides name entry during answer review and restores it when review closes", () => {
+    screen.setResult(escaped(), []);
+    find("review-answers").fire("click");
+    expect(nameBoxShown()).toBe(false);
+    screen.show();
+    expect(nameBoxShown()).toBe(false);
+    find("close-review").fire("click");
+    expect(nameBoxShown()).toBe(true);
+  });
+
   it("shows Caught!, score 0 and no name box for a Caught Heist", () => {
     screen.setResult(caught(), []);
 
@@ -341,7 +374,7 @@ describe("EndScreen", () => {
 
     //check one mistake card was created
     expect((find("review-mistakes") as Konva.Group).getChildren()
-    ).toHaveLength(1);    
+    ).toHaveLength(1);
     });
 
     //Test 4: Display correct status
@@ -355,14 +388,14 @@ describe("EndScreen", () => {
 
     const texts = visibleTexts(screen.layer);
 
-    
+
     expect(texts).toContain("Solved");
     expect(texts).toContain("No incorrect attempts!");
     expect(texts).toContain("Question 1 of 1");
 
     //no mistake cards should be created
     expect((find("review-mistakes") as Konva.Group).getChildren()
-    ).toHaveLength(0);    
+    ).toHaveLength(0);
     });
 
     //Test 5: Verify questions display in order and update their status
@@ -405,7 +438,7 @@ describe("EndScreen", () => {
         expect(texts).toContain("Question 2 of 2");
 
         expect((find("review-mistakes") as Konva.Group).getChildren()
-        ).toHaveLength(1); 
+        ).toHaveLength(1);
     });
 
     //Test 6: Next and Previous Buttons

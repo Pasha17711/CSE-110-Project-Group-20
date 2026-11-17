@@ -260,8 +260,8 @@ export class MapScreen implements MapScreenContract {
       y: 4,
       ...BUTTON,
       cornerRadius: 24,
-      fill: isBonus && state !== "solved" ? BONUS_COLORS.buttonStroke : 
-      state === "solved" ? COLORS.buttonSolved 
+      fill: isBonus && state !== "solved" ? BONUS_COLORS.buttonStroke :
+      state === "solved" ? COLORS.buttonSolved
       : COLORS.purple,
       listening: false,
     }));
@@ -324,9 +324,9 @@ export class MapScreen implements MapScreenContract {
       text: room.name,
       align: "center",
       verticalAlign: "middle",
-      fill: isBonus && state === "open" ? BONUS_COLORS.text : 
-        isVault && state === "open" ? VAULT_COLORS.buttonStroke : 
-        isVault && state === "locked" ? VAULT_COLORS.blue : 
+      fill: isBonus && state === "open" ? BONUS_COLORS.text :
+        isVault && state === "open" ? VAULT_COLORS.buttonStroke :
+        isVault && state === "locked" ? VAULT_COLORS.blue :
         state === "solved" ? COLORS.darkGreen :
         COLORS.purple,
       listening: false,

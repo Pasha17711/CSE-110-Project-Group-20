@@ -18,23 +18,23 @@ export const COLORS = {
 } as const;
 
 export const BONUS_COLORS = {
-  floor: "rgba(238, 229, 162, 1)", 
+  floor: "rgba(238, 229, 162, 1)",
   border: "#b45309",
-  buttonFill: "#fef08a", 
-  buttonStroke: "#d97706", 
-  text: "#78350f", 
+  buttonFill: "#fef08a",
+  buttonStroke: "#d97706",
+  text: "#78350f",
 };
 
 export const VAULT_COLORS = {
-  floorLocked: "#343943ff",  
-  floorOpen: "#334155", 
-  borderLocked: "#3397c2ff",  
+  floorLocked: "#343943ff",
+  floorOpen: "#334155",
+  borderLocked: "#3397c2ff",
   borderOpen: "#60a5fa",
-  button: "#2f2e3bff", 
+  button: "#2f2e3bff",
   buttonLocked: '#828aaaff',
   buttonStroke: "#0284c7",
-  buttonStar: "#38bdf8", 
-  textLocked: "#94a3b8", 
+  buttonStar: "#38bdf8",
+  textLocked: "#94a3b8",
   blue: "#053072ff",
 };
 

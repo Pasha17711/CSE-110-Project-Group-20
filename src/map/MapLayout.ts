@@ -83,7 +83,7 @@ export class MapLayout {
             kind: "bonus",
         });
 
-        // Place + assign room widths & heights 
+        // Place + assign room widths & heights
         grid.placeRoom(roomA, 0, 0, 1, 1);
         grid.placeRoom(roomB, 0, 1, 1, 1);
         grid.placeRoom(vault, 0, 2, 1, 2);

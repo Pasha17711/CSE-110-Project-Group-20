@@ -90,15 +90,18 @@ class FakeRoomScreen implements RoomScreen {
   question: Question | null = null;
   roomName = "";
   setRoomCalls = 0;
+  usedHints = 0;
   hud: Hud | null = null;
   readonly answer = new Slot<[StepAnswer]>();
   readonly exit = new Slot<[]>();
+  readonly hint = new Slot<[]>();
 
   show(): void {}
   hide(): void {}
 
-  setRoom(room: Room): void {
+  setRoom(room: Room, usedHints = 0): void {
     this.room = room;
+    this.usedHints = usedHints;
     this.question = room.question;
     this.roomName = room.name;
     this.setRoomCalls += 1;
@@ -122,6 +125,12 @@ class FakeRoomScreen implements RoomScreen {
 
   leave(): void {
     this.exit.fire();
+  }
+  onHint(cb: () => void): Unsubscribe {
+    return this.hint.set(cb);
+  }
+  useHint(): void {
+    this.hint.fire();
   }
 }
 
@@ -309,6 +318,22 @@ describe("Game", () => {
     expect(mapScreen.solved).toEqual([]);
   });
 
+  it("charges hints only against the room where they were used, even after re-entry", () => {
+    game.start();
+    mapScreen.click("room_a");
+    roomScreen.useHint();
+    roomScreen.leave();
+    mapScreen.click("room_a");
+    expect(roomScreen.usedHints).toBe(1);
+    roomScreen.useHint();
+    roomScreen.useHint(); // More than two hints cannot be charged.
+    roomScreen.submit(lastStep(mapScreen.room("room_a").question));
+    expect(mapScreen.hud?.money).toBe(50);
+    expect(count(EventType.HintUsed)).toBe(2);
+    enterAndSolve("room_b");
+    expect(mapScreen.hud?.money).toBe(150);
+  });
+
   it("a correct last Step in a Main Room solves it, adds money and returns to the map", () => {
     game.start();
 
@@ -432,6 +457,7 @@ describe("Game", () => {
   it("records an Answer under its own Question, and solves the Room only on solvesRoom", () => {
     game.start();
     mapScreen.click("room_a");
+    roomScreen.useHint();
     const wireOne: Question = { prompt: "x + 1 = 3", answer: "2" };
     const wireTwo: Question = { prompt: "x + 2 = 7", answer: "5" };
 
@@ -439,9 +465,11 @@ describe("Game", () => {
     roomScreen.submit({ playerAnswer: "2", correctAnswer: "2", isLastStep: true, question: wireOne, solvesRoom: false });
     expect(shown[shown.length - 1]).toBe("room");
     expect(count(EventType.RoomSolved)).toBe(0);
+    expect(mapScreen.hud?.money).toBe(0);
 
     roomScreen.submit({ playerAnswer: "5", correctAnswer: "5", isLastStep: true, question: wireTwo, solvesRoom: true });
     expect(count(EventType.RoomSolved)).toBe(1);
+    expect(mapScreen.hud?.money).toBe(75);
     expect(mapScreen.solved).toEqual(["room_a"]);
     expect(shown[shown.length - 1]).toBe("map");
 

@@ -70,8 +70,8 @@ export default class KeypadInput extends Konva.Group {
             //Adds 60 after each 3rd entry by using floor and dividing 3
             const y = 65 + Math.floor(index / 3) * 60;
 
-            const button = new Konva.Group({ x, y });   
-            
+            const button = new Konva.Group({ x, y });
+
             const background = new Konva.Rect({
                 width: 60,
                 height: 50,
@@ -137,4 +137,4 @@ export default class KeypadInput extends Konva.Group {
         this.answerDisplay.text(answer || "Enter answer");
         this.getLayer()?.batchDraw();
     }
-}   
+}

@@ -146,7 +146,7 @@ class BasicMultistepPuzzle implements Puzzle {
     };
 
 
-    
+
     this.view.onTargetDropped = (index, isLeftSide) => {
       this.controller.operation(index, isLeftSide)
     }
@@ -170,19 +170,19 @@ class BasicMultistepPuzzle implements Puzzle {
     }
 
     this.controller.onAnswerSubmit = (
-      _question, 
-      playerAnswer, 
-      correctAnswer, 
-      isLastStep, 
+      _question,
+      playerAnswer,
+      correctAnswer,
+      isLastStep,
       stepPrompt) => {
       this.textInput.clear()
       this.keypadAnswer = ''
       this.keypad.setAnswer()
-  
+
       if (playerAnswer === correctAnswer) {
         this.controller.step()
       }
-      
+
         this.onAnswer?.({ playerAnswer, correctAnswer, isLastStep, stepPrompt })
     }
 
@@ -196,7 +196,7 @@ class BasicMultistepPuzzle implements Puzzle {
 
       if (state === 'Arithmetic') {
         this.actionMenu.hide()
-        
+
         if (this.options.inputType === "keypad") {
         this.textInput.hide()
 
@@ -221,6 +221,12 @@ class BasicMultistepPuzzle implements Puzzle {
         this.onPuzzleFinished?.(true)
       }
     }
+  }
+
+  /** Suspends the HTML input while a screen modal covers the canvas controls. */
+  public setInteractionEnabled(enabled: boolean): void {
+    if (enabled) this.textInput.enable()
+    else this.textInput.disable()
   }
 
   /** Removes the puzzle from its layer, including the text input's HTML element. */

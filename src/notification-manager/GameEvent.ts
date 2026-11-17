@@ -12,9 +12,12 @@ export enum EventType {
   ReturnedToMap = "returnedToMap",
   /** The last Step of a Room was answered correctly. */
   RoomSolved = "roomSolved",
+  /** A hint was used in a specific room, reducing that room\'s eventual payout. */
+  HintUsed = "hintUsed",
 }
 
 /** RoomSolved says which kind of Room was solved; every other event has no data. */
 export type GameEvent =
-  | { eventType: EventType.RoomSolved; roomKind: RoomKind }
-  | { eventType: Exclude<EventType, EventType.RoomSolved> };
+  | { eventType: EventType.RoomSolved; roomKind: RoomKind; roomId?: string }
+  | { eventType: EventType.HintUsed; roomId: string }
+  | { eventType: Exclude<EventType, EventType.RoomSolved | EventType.HintUsed> };

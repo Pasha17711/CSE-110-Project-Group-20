@@ -177,6 +177,7 @@ class TextInput extends Konva.Group {
   }
 
   private submitText(): void {
+    if (!this.enabled) return // Disabling a focused input for a hint can trigger blur.
     this.onTextEntered?.(this.text())
   }
 

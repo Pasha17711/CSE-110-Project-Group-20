@@ -6,7 +6,7 @@ import { LASER_PAIR_COUNT } from '../graph/graph-equation-generator';
 
 
 describe('MapLayout Tests', () => {
-    
+
     describe('Easy layout tests', () => {
         test('creates a 2x3 grid with exactly 5 rooms', () => {
             const layout = MapLayout.createLayout(Difficulty.Easy);
@@ -154,7 +154,7 @@ describe('MapLayout Tests', () => {
             rowSpan: 1,
             visualColSpan: 1.5,
         });
-        
+
     });
 
         test('configures multi-branch prerequisites for Hard difficulty', () => {
