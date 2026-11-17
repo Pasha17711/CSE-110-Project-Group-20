@@ -1,6 +1,8 @@
 import { describe, test, expect } from 'vitest';
 import { MapLayout } from './MapLayout';
 import { Difficulty } from '../score';
+import { PAIR_COUNT } from '../power-box/power-box-generator';
+import { LASER_PAIR_COUNT } from '../graph/graph-equation-generator';
 
 
 describe('MapLayout Tests', () => {
@@ -165,6 +167,30 @@ describe('MapLayout Tests', () => {
         expect(roomE?.prerequisites).toEqual(['room_b', 'room_c']);
         expect(vault?.prerequisites).toEqual(['room_e', 'room_d']);
         });
+    });
+
+    describe('Room puzzles', () => {
+        test.each([Difficulty.Easy, Difficulty.Medium, Difficulty.Hard])(
+            'Room B is the Power Box, Room C the Laser Match, the rest multistep (Difficulty %s)',
+            (difficulty) => {
+                const { rooms } = MapLayout.createLayout(difficulty);
+                const byId = new Map(rooms.map((r) => [r.id, r]));
+
+                const powerBox = byId.get('room_b')!;
+                if (powerBox.puzzle.type !== 'powerBox') throw new Error('room_b is not a Power Box');
+                expect(powerBox.puzzle.pairs).toHaveLength(PAIR_COUNT[difficulty]);
+                expect(powerBox.question).toBe(powerBox.puzzle.pairs[0].question);
+
+                const laser = byId.get('room_c')!;
+                if (laser.puzzle.type !== 'laser') throw new Error('room_c is not a Laser Match');
+                expect(laser.puzzle.questions).toHaveLength(LASER_PAIR_COUNT);
+                expect(laser.question).toBe(laser.puzzle.questions[0]);
+
+                for (const room of rooms.filter((r) => r.id !== 'room_b' && r.id !== 'room_c')) {
+                    expect(room.puzzle).toEqual({ type: 'multistep' });
+                }
+            },
+        );
     });
 
 });
