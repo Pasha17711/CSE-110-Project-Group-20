@@ -151,6 +151,15 @@ describe("ScoreController", () => {
       expect(c.getModel().getIncorrectAnswers()).toBe(1);
     });
 
+    it("HintUsed reduces only its room reward and not the clock", () => {
+      notifications.send({ eventType: EventType.HintUsed, roomId: "room_a" });
+      expect(remaining(c)).toBe(600_000);
+      expect(c.getModel().getIncorrectAnswers()).toBe(0);
+      notifications.send({ eventType: EventType.RoomSolved, roomKind: "main", roomId: "room_a" });
+      notifications.send({ eventType: EventType.RoomSolved, roomKind: "main", roomId: "room_b" });
+      expect(c.getModel().getMoney()).toBe(225 + 300);
+    });
+
     it("RoomSolved adds money for its room kind", () => {
       notifications.send({ eventType: EventType.RoomSolved, roomKind: "main" });
       notifications.send({ eventType: EventType.RoomSolved, roomKind: "bonus" });

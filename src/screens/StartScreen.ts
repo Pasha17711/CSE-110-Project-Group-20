@@ -24,6 +24,10 @@ export class StartScreen implements StartScreenContract {
   private readonly settings = new Listeners<[]>();
   private readonly leaderboardClicks = new Listeners<[]>();
   private readonly credits = new Listeners<[]>();
+  private readonly muteChanges = new Listeners<[boolean]>();
+  private readonly audioSettings = new Konva.Group({ visible: false, name: "audio-settings" });
+  private muteLabel: Konva.Text | null = null;
+  private muted = false;
 
   private readonly leaderboard?: Leaderboard;
   private readonly leaderboardModal = new Konva.Group({ visible: false });
@@ -85,6 +89,7 @@ export class StartScreen implements StartScreenContract {
 
     // Leaderboard displayed when trophy button is clicked
     this.buildLeaderboardModal();
+    this.buildAudioSettings();
   }
 
   private drawVaultDoor(): void {
@@ -198,7 +203,12 @@ export class StartScreen implements StartScreenContract {
       label: "SETTINGS",
       fill: "#ffffff",
       name: "settings-button",
-      onClick: () => this.settings.emit(),
+      onClick: () => {
+        this.settings.emit();
+        this.audioSettings.show();
+        this.audioSettings.moveToTop();
+        this.layer.batchDraw();
+      },
     }));
 
     this.layer.add(this.mainMenuGroup);
@@ -487,6 +497,61 @@ export class StartScreen implements StartScreenContract {
     });
   }
 
+  /** A lightweight Settings screen using the same colors and positions as Figma 50:2. */
+  private buildAudioSettings(): void {
+    this.audioSettings.add(new Konva.Rect({
+      width: DESIGN_WIDTH, height: DESIGN_HEIGHT, fill: COLORS.background,
+    }));
+    this.audioSettings.add(new Konva.Rect({
+      x: 206, y: 136, width: 987, height: 627,
+      fill: COLORS.room, cornerRadius: 18, name: "settings-panel",
+    }));
+    this.audioSettings.add(createText({
+      x: 300, y: 60, width: 840, text: "SETTINGS",
+      fontFamily: "Gasoek One", fontStyle: "normal", fontSize: 80,
+      align: "center", fill: COLORS.gold, listening: false,
+    }));
+    this.audioSettings.add(createText({
+      x: 245, y: 258, width: 900, text: "Sound Effects",
+      fontSize: 50, fill: COLORS.purple, listening: false,
+    }));
+    this.audioSettings.add(createText({
+      x: 245, y: 346, width: 900,
+      text: "Sound effects play when you answer, solve a room, or use a hint.",
+      fontSize: 25, fill: COLORS.purple, listening: false,
+    }));
+    const muteToggle = new Konva.Group({ x: 245, y: 443, name: "audio-mute-toggle" });
+    muteToggle.add(new Konva.Rect({
+      width: 550, height: 90, cornerRadius: 24,
+      fill: COLORS.green, stroke: COLORS.purple, strokeWidth: 4,
+    }));
+    this.muteLabel = createText({
+      width: 550, height: 90, text: "Sound Effects: ON", name: "audio-mute-label",
+      align: "center", verticalAlign: "middle", fontSize: 40,
+      fill: COLORS.purple, listening: false,
+    });
+    muteToggle.add(this.muteLabel);
+    muteToggle.on("mouseenter", () => setCursor(muteToggle, "pointer"));
+    muteToggle.on("mouseleave", () => setCursor(muteToggle, ""));
+    muteToggle.on("click tap", () => {
+      this.muted = !this.muted;
+      this.muteLabel?.text(this.muted ? "Sound Effects: OFF" : "Sound Effects: ON");
+      this.muteChanges.emit(this.muted);
+      this.layer.batchDraw();
+    });
+    this.audioSettings.add(muteToggle);
+    this.audioSettings.add(this.createStyledMenuButton({
+      x: 948, y: 648, width: 163, height: 65,
+      label: "Back", fill: COLORS.white, name: "settings-back",
+      onClick: () => { this.audioSettings.hide(); this.layer.batchDraw(); },
+    }));
+    this.layer.add(this.audioSettings);
+  }
+
+  onAudioMuteChange(cb: (muted: boolean) => void): Unsubscribe {
+    return this.muteChanges.add(cb);
+  }
+
   onStart(cb: (difficulty: Difficulty) => void): Unsubscribe {
     return this.starts.add(cb);
   }
@@ -510,6 +575,7 @@ export class StartScreen implements StartScreenContract {
   show(): void {
     // Reset to primary menu whenever returning to StartScreen
     this.leaderboardModal.hide();
+    this.audioSettings.hide();
     this.difficultyGroup.hide();
     this.mainMenuGroup.show();
     this.layer.show();
