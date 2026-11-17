@@ -150,7 +150,7 @@ export class Game {
     if (this.ended) return;
     if (event.room) {
       this.stepNumbers.clear();
-      this.roomScreen.setQuestion(event.room.question, event.room.name);
+      this.roomScreen.setRoom(event.room);
       this.updateHud();
       this.screens.show("room");
     } else if (event.screen === "map") {

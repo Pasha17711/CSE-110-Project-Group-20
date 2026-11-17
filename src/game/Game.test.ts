@@ -83,12 +83,13 @@ class FakeMapScreen implements MapScreen {
   }
 }
 
-/** RoomScreen fake: records the Question and HUD, and lets tests answer and exit. */
+/** RoomScreen fake: records the Room and HUD, and lets tests answer and exit. */
 class FakeRoomScreen implements RoomScreen {
   readonly layer = {} as Konva.Layer;
+  room: Room | null = null;
   question: Question | null = null;
   roomName = "";
-  setQuestionCalls = 0;
+  setRoomCalls = 0;
   hud: Hud | null = null;
   readonly answer = new Slot<[StepAnswer]>();
   readonly exit = new Slot<[]>();
@@ -96,10 +97,11 @@ class FakeRoomScreen implements RoomScreen {
   show(): void {}
   hide(): void {}
 
-  setQuestion(question: Question, roomName: string): void {
-    this.question = question;
-    this.roomName = roomName;
-    this.setQuestionCalls += 1;
+  setRoom(room: Room): void {
+    this.room = room;
+    this.question = room.question;
+    this.roomName = room.name;
+    this.setRoomCalls += 1;
   }
 
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void {
@@ -226,8 +228,17 @@ describe("Game", () => {
     mapScreen.click("room_a");
 
     expect(roomScreen.question).toBe(question);
-    expect(roomScreen.setQuestionCalls).toBe(2);
+    expect(roomScreen.setRoomCalls).toBe(2);
     expect(mapScreen.room("room_a").question).toBe(question);
+  });
+
+  it("hands the Room Screen the whole Room, so it can build that Room's kind of puzzle", () => {
+    game.start();
+
+    mapScreen.click("room_b");
+
+    expect(roomScreen.room).toBe(mapScreen.room("room_b"));
+    expect(roomScreen.room?.puzzle.type).toBe("powerBox");
   });
 
   it("clicking a locked Room shows access denied, without a screen change or the clock starting", () => {
@@ -329,11 +340,11 @@ describe("Game", () => {
   it("a Solved Room can't be re-entered", () => {
     game.start();
     enterAndSolve("room_a");
-    const setQuestionCalls = roomScreen.setQuestionCalls;
+    const setRoomCalls = roomScreen.setRoomCalls;
 
     mapScreen.click("room_a");
 
-    expect(roomScreen.setQuestionCalls).toBe(setQuestionCalls);
+    expect(roomScreen.setRoomCalls).toBe(setRoomCalls);
     expect(shown).toEqual(["map", "room", "map"]);
   });
 
