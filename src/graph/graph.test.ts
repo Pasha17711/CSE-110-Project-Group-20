@@ -6,6 +6,7 @@ import {
   DEFAULT_GRAPH_MIN_X,
   DEFAULT_GRAPH_MIN_Y,
   equationFromConfig,
+  formatGraphEquation,
   parseEquation,
 } from './graph';
 
@@ -39,6 +40,22 @@ describe('graph equation parsing', () => {
     expect(() => parseEquation('y = m * x + b')).toThrow(/Unsupported equation/);
     expect(() => parseEquation('y = 2 * x')).toThrow(/Unsupported equation/);
     expect(() => parseEquation('not an equation')).toThrow(/Unsupported equation/);
+  });
+});
+
+describe('formatGraphEquation', () => {
+  it.each([
+    ['y = 2 * x + 1', 'y = 2x + 1'],
+    ['y = -1 * x - 2', 'y = -x - 2'],
+    ['y = 1 * x + 0', 'y = x'],
+    ['y = 0 * x + 3', 'y = 3'],
+    ['y = 0 * x + 0', 'y = 0'],
+    ['y = 1 * x * x + 0 * x - 2', 'y = x² - 2'],
+    ['y = -1 * x * x + 1 * x + 0', 'y = -x² + x'],
+    ['y = -2 * x * x - 3 * x + 1', 'y = -2x² - 3x + 1'],
+    ['y = 0 * x * x - 1 * x + 2', 'y = -x + 2'],
+  ])('writes %s as %s', (equation, shown) => {
+    expect(formatGraphEquation(equation)).toBe(shown);
   });
 });
 
