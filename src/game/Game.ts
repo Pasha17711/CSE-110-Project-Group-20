@@ -1,17 +1,17 @@
 import { NotificationManager } from "../notification-manager/NotificationManager";
 import { EventType } from "../notification-manager/GameEvent";
-import { getQuestion } from "../questions/QuestionGenerator";
 import type { StepAnswer } from "../questions/Question";
 import { ScoreController, ScoreModel } from "../score";
 import type { Difficulty, ScoreSnapshot } from "../score";
 import { MapController } from "../map/MapController";
 import type { SwitchMapScreen } from "../map/MapController";
-import { Room, type RoomKind } from "../map/Room";
+import { Room } from "../map/Room";
 import { AnswerHistory } from "../validation/AnswerHistory";
 import type { AnswerRecord } from "../validation/AnswerHistory";
 import { AnswerValidator } from "../validation/AnswerValidator";
 import type { ScreenController } from "../screens/ScreenController";
 import type { MapScreen, RoomScreen, Unsubscribe } from "../screens/contracts";
+import { MapLayout } from "../map/MapLayout";
 
 export type HeistOutcome = "escaped" | "caught";
 
@@ -28,23 +28,7 @@ export interface GameDeps {
   roomScreen: RoomScreen;
 }
 
-interface RoomLayout {
-  id: string;
-  name: string;
-  kind: RoomKind;
-  prerequisites: string[];
-}
-
 export const VAULT_ID = "vault";
-
-/** The bank's Rooms, from the map layout in #30. */
-export const ROOM_LAYOUT: readonly RoomLayout[] = [
-  { id: "room_a", name: "Room A", kind: "main", prerequisites: [] },
-  { id: "room_b", name: "Room B", kind: "main", prerequisites: [] },
-  { id: "room_c", name: "Room C", kind: "main", prerequisites: ["room_a", "room_b"] },
-  { id: "room_X", name: "Room X", kind: "bonus", prerequisites: [] },
-  { id: VAULT_ID, name: "Vault", kind: "main", prerequisites: ["room_c"] },
-];
 
 /**
  * One Heist. Builds the heist-scoped modules and wires them to the
@@ -74,6 +58,7 @@ export class Game {
   private answering = false;
   private pendingOutcome: HeistOutcome | null = null;
 
+  private currentStepNumber = 1;
   constructor(difficulty: Difficulty, deps: GameDeps) {
     this.notifications = deps.notifications;
     this.screens = deps.screens;
@@ -84,10 +69,10 @@ export class Game {
     this.score = new ScoreController(new ScoreModel({ difficulty }));
     // The score changes only through events; score.dispose() unsubscribes.
     this.score.listenTo(this.notifications);
-    this.map = new MapController(this.notifications);
-    this.rooms = ROOM_LAYOUT.map(
-      (r) => new Room({ ...r, question: getQuestion(difficulty) }),
-    );
+    // Generates map layout based on difficulty
+    const layout = MapLayout.createLayout(difficulty);
+    this.rooms = layout.rooms;
+    this.map = new MapController(this.notifications, layout.grid);
     this.rooms.forEach((room) => this.map.registerRoom(room));
     this.validator = new AnswerValidator(this.history, this.notifications);
 
@@ -95,7 +80,7 @@ export class Game {
   }
 
   start(): void {
-    this.mapScreen.setRooms(this.rooms, this.map.solvedRooms);
+    this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
     this.updateHud();
     this.screens.show("map");
     this.notifications.send({ eventType: EventType.GameStart });
@@ -158,11 +143,13 @@ export class Game {
   private handleScreenChange(event: SwitchMapScreen): void {
     if (this.ended) return;
     if (event.room) {
+      this.currentStepNumber = 1;
       this.roomScreen.setQuestion(event.room.question, event.room.name);
       this.updateHud();
       this.screens.show("room");
     } else if (event.screen === "map") {
-      this.mapScreen.setRooms(this.rooms, this.map.solvedRooms);
+      // Update grid to show completed rooms
+      this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
       this.screens.show("map");
     }
   }
@@ -177,10 +164,16 @@ export class Game {
     this.answering = true;
     let correct: boolean;
     try {
-      correct = this.validator.validateAnswer(room.question, answer, room.kind);
+      correct = this.validator.validateAnswer(room.question, answer, room.kind,
+        this.currentStepNumber);
+        if (correct) {
+          this.currentStepNumber++;
+          }
     } finally {
       this.answering = false;
     }
+
+    
 
     // The clock can also hit zero between ticks; a solve is then rejected by
     // the score, so the Heist ends Caught rather than Escaped.

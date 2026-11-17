@@ -22,7 +22,8 @@ export class AnswerValidator {
      * Correct last Step → RoomSolved, then Correct.
      * Correct earlier Step → Correct only. Returns whether it was correct.
      */
-    validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind): boolean {
+    validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind,
+        stepNumber?: number): boolean {
         const isCorrect = answer.playerAnswer.trim() === answer.correctAnswer.trim();
 
         if (isCorrect && answer.isLastStep) {
@@ -39,6 +40,8 @@ export class AnswerValidator {
             correctAnswer: answer.correctAnswer,
             isCorrect,
             isLastStep: answer.isLastStep,
+            stepPrompt: answer.stepPrompt,
+            ...(stepNumber !== undefined ? { stepNumber } : {}),
         });
 
         return isCorrect;

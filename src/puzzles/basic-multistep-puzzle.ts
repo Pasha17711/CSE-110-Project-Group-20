@@ -168,12 +168,21 @@ class BasicMultistepPuzzle {
       this.controller.arithmetic(answer)
     }
 
-    this.controller.onAnswerSubmit = (_question, playerAnswer, correctAnswer, isLastStep) => {
+    this.controller.onAnswerSubmit = (
+      _question, 
+      playerAnswer, 
+      correctAnswer, 
+      isLastStep, 
+      stepPrompt) => {
       this.textInput.clear()
       this.keypadAnswer = ''
       this.keypad.setAnswer()
-      if (playerAnswer === correctAnswer) this.controller.step()
-      this.onAnswer?.({ playerAnswer, correctAnswer, isLastStep })
+  
+      if (playerAnswer === correctAnswer) {
+        this.controller.step()
+      }
+      
+        this.onAnswer?.({ playerAnswer, correctAnswer, isLastStep, stepPrompt })
     }
 
     this.controller.onStateChange = state => {

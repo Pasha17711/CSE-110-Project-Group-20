@@ -15,6 +15,12 @@ import { Game, type HeistResult } from "./game/Game";
  * (or straight into a new Heist).
  */
 
+// Force-load fonts in before creating StartScreen
+await Promise.all([
+  document.fonts.load('400 82px "Gasoek One"'),
+]);
+await document.fonts.ready;
+
 const stage = new Konva.Stage({
   container: "container",
   width: window.innerWidth,
@@ -24,7 +30,7 @@ const notifications = new NotificationManager();
 const leaderboard = new Leaderboard();
 const screens = new ScreenController(stage);
 
-const startScreen = new StartScreen(stage.width(), stage.height());
+const startScreen = new StartScreen(stage.width(), stage.height(), leaderboard);
 const mapScreen = new MapScreen(stage.width(), stage.height());
 const roomScreen = new RoomScreen(stage.width(), stage.height(), notifications);
 const endScreen = new EndScreen(stage.width(), stage.height());
@@ -34,6 +40,12 @@ screens.register("map", mapScreen);
 screens.register("room", roomScreen);
 screens.register("end", endScreen);
 screens.show("start");
+
+// Safety net: if a font finishes downloading after startup, re-center all Konva.Text nodes
+document.fonts.addEventListener("loadingdone", () => {
+  stage.find("Text").forEach((node) => node.clearCache());
+  stage.batchDraw();
+});
 
 let game: Game | null = null;
 let lastResult: HeistResult | null = null;

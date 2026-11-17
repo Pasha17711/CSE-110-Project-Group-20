@@ -89,14 +89,14 @@ class MultistepSolverModel {
       const value = current[index];
       current.splice(index - 1, 2);
 
-      const newSideArray = newSide.flatMap(term => {
-        if (typeof term === 'string') return term;
+      const newSideArray = newSide.flatMap((term, i) => {
+        if (typeof term === 'string' || newSide[i + 1] === '*' || newSide[i + 1] === '/') return term;
         return [term, oppositeOp, value];
       });
       newSide.splice(0, newSide.length, ...newSideArray);
 
       const currentArray = current.flatMap((term, i) => {
-        if (typeof term === 'string') return term;
+        if (typeof term === 'string' || current[i + 1] === '*' || current[i + 1] === '/') return term;
         if (i === index - 2) return term;
         return [term, oppositeOp, value];
       });
@@ -344,6 +344,7 @@ class MultistepSolverModel {
         }
 
         const nextValue = this.parseFraction(next.term);
+        if (!next.positive) nextValue.numerator *= -1;
         if (next.constant) {
           coefficient = operation === '*'
             ? this.multiplyFractions(coefficient, nextValue)
@@ -442,12 +443,17 @@ class MultistepSolverModel {
       if (!left.constant || !right.constant) continue;
       if (operation !== '*' && operation !== '/') continue;
 
+      // When `left` is a divisor, the next factor should combine with the opposite operator, e.g.
+      // x / a / b = x / (a * b)
+      // x / a * b = x / (a / b)
+      const foldOperation = side[index - 1] === '/' ? this.getOppositeOp(operation) : operation;
+
       let leftValue = this.parseFraction(left.term);
       let rightValue = this.parseFraction(right.term);
       if (!left.positive) leftValue.numerator *= -1;
       if (!right.positive) rightValue.numerator *= -1;
 
-      const result = operation === '*'
+      const result = foldOperation === '*'
         ? this.multiplyFractions(leftValue, rightValue)
         : this.divideFractions(leftValue, rightValue);
       const sign = result.numerator < 0 ? -1 : 1;
@@ -462,7 +468,7 @@ class MultistepSolverModel {
         side,
         start: index,
         end: index + 2,
-        text: this.formatTerm(side, index, index + 2),
+        text: `${this.formatTerm(side, index, index)} ${foldOperation} ${this.formatTerm(side, index + 2, index + 2)}`,
         answer: `${sign < 0 ? '-' : ''}${this.fractionText(magnitude)}`,
         replacement: [replacement],
       });

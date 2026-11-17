@@ -12,4 +12,6 @@ export interface StepAnswer {
   correctAnswer: string;
   /** True for the Step that solves the Question. */
   isLastStep: boolean;
+  stepPrompt?: string;
+
 }
