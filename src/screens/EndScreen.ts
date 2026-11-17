@@ -63,7 +63,7 @@ export class EndScreen implements EndScreenContract {
 
   private readonly reviewQuestionText: Konva.Text;
   private readonly reviewPlayerAnswerText: Konva.Text;
-  private readonly reviewCorrectAnswerText: Konva.Text;
+  private readonly reviewTotalMistakesText: Konva.Text;
   private readonly reviewCounterText: Konva.Text;
   private readonly reviewStatusText: Konva.Text;
   private readonly reviewStatusBubble: Konva.Rect;
@@ -228,7 +228,7 @@ export class EndScreen implements EndScreenContract {
   });
 
   // Display the expected answer
-  this.reviewCorrectAnswerText = createText({
+  this.reviewTotalMistakesText = createText({
     x: 300,
     y: 510,
     width: 840,
@@ -274,7 +274,7 @@ this.reviewStatusBubble = new Konva.Rect({
   this.reviewModal.add(
     this.reviewQuestionText,
     this.reviewPlayerAnswerText,
-    this.reviewCorrectAnswerText,
+    this.reviewTotalMistakesText,
     this.reviewCounterText,
     this.reviewStatusBubble,
     this.reviewStatusText,
@@ -372,19 +372,20 @@ this.reviewStatusBubble = new Konva.Rect({
             reviews.set(record.question, review);
         }
 
-        const step = stepByQuestion.get(record.question) ?? 0;
-
+        const previousStep = stepByQuestion.get(record.question) ?? 0;
+        const step = record.stepNumber ?? previousStep + 1;
+        
         if (!record.isCorrect) {
             // check whether this step already has a recorded mistake
             const existing = review.mistakes.find(
-                mistake => mistake.stepNumber === step + 1
+                mistake => mistake.stepNumber === step 
             );
 
             if (existing) {
                 existing.incorrectAttempts++;
             } else {
                 review.mistakes.push({
-                    stepNumber: step + 1,
+                    stepNumber: step,
                     stepPrompt: record.stepPrompt,
                     firstIncorrectAnswer: record.playerAnswer,
                     correctAnswer: record.correctAnswer,
@@ -393,7 +394,7 @@ this.reviewStatusBubble = new Konva.Rect({
             }
         } else {
             // correct answers advance the step
-            stepByQuestion.set(record.question, step + 1);
+            stepByQuestion.set(record.question, step);
 
             // mark the question solved when its final step is correct
             if (record.isLastStep) {
@@ -428,12 +429,14 @@ this.reviewStatusBubble = new Konva.Rect({
 
   private showReviewQuestion(): void {
      const review = this.reviewAnswers[this.reviewIndex];
-
+      // clear previous questions mistake cards
+      this.reviewMistakesGroup.destroyChildren();
+      
     if (!review) {
         this.reviewCounterText.text("Question 0 of 0");
         this.reviewQuestionText.text("No answers to review.");
         this.reviewPlayerAnswerText.text("");
-        this.reviewCorrectAnswerText.text("");
+        this.reviewTotalMistakesText.text("");
         this.reviewStatusText.text("");
         this.reviewStatusBubble.hide();
         return;
@@ -471,16 +474,13 @@ this.reviewStatusBubble = new Konva.Rect({
     this.reviewQuestionText.text(review.question.prompt);
 
     // display first incorrect answer for each mistaken step
-    
-    // clear previous questions mistake cards
-    this.reviewMistakesGroup.destroyChildren();
 
     // remove the old combined text
     this.reviewPlayerAnswerText.text("");
 
     if (review.mistakes.length === 0) {
         this.reviewPlayerAnswerText.text("No incorrect attempts!");
-        this.reviewCorrectAnswerText.text("");
+        this.reviewTotalMistakesText.text("");
     } else {
         // display up to four mistakes in a two-column grid
         const visibleMistakes = review.mistakes.slice(0, 4);
@@ -544,8 +544,8 @@ this.reviewStatusBubble = new Konva.Rect({
             0
         );
 
-        this.reviewCorrectAnswerText.y(610);
-        this.reviewCorrectAnswerText.text(
+        this.reviewTotalMistakesText.y(610);
+        this.reviewTotalMistakesText.text(
             `Total incorrect attempts: ${totalMistakes}` 
         );
     }

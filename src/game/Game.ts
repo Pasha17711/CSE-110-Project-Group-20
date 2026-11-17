@@ -74,6 +74,7 @@ export class Game {
   private answering = false;
   private pendingOutcome: HeistOutcome | null = null;
 
+  private currentStepNumber = 1;
   constructor(difficulty: Difficulty, deps: GameDeps) {
     this.notifications = deps.notifications;
     this.screens = deps.screens;
@@ -158,6 +159,7 @@ export class Game {
   private handleScreenChange(event: SwitchMapScreen): void {
     if (this.ended) return;
     if (event.room) {
+      this.currentStepNumber = 1;
       this.roomScreen.setQuestion(event.room.question, event.room.name);
       this.updateHud();
       this.screens.show("room");
@@ -177,10 +179,16 @@ export class Game {
     this.answering = true;
     let correct: boolean;
     try {
-      correct = this.validator.validateAnswer(room.question, answer, room.kind);
+      correct = this.validator.validateAnswer(room.question, answer, room.kind,
+        this.currentStepNumber);
+        if (correct) {
+          this.currentStepNumber++;
+          }
     } finally {
       this.answering = false;
     }
+
+    
 
     // The clock can also hit zero between ticks; a solve is then rejected by
     // the score, so the Heist ends Caught rather than Escaped.
