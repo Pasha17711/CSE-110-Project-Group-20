@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('konva', () => import('../screens/testing/fakeKonva'));
 
 import Konva from 'konva';
+import type { FakeNode } from '../screens/testing/fakeKonva';
 import LaserMatchView from './laser-match-view';
 
 describe('LaserMatchView', () => {
@@ -18,7 +19,7 @@ describe('LaserMatchView', () => {
 
     graph.fire('click');
 
-    const root = layer.getChildren()[0];
+    const root = layer.getChildren()[0] as unknown as FakeNode;
     const graphRadio = root.getChildren().find(child => child.x() === 165);
     expect(graphRadio?.getChildren()[1].fill()).toBe('#ffffff');
 
