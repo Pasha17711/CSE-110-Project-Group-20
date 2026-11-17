@@ -410,7 +410,7 @@ describe("Game", () => {
 
     const { history } = game.getResult();
     expect(history).toHaveLength(9);
-    expect(history.slice(0, 3)).toEqual([
+    expect(history.slice(0, 3)).toMatchObject([
       { question, playerAnswer: "+", correctAnswer: "-", isCorrect: false, isLastStep: false },
       { question, playerAnswer: "-", correctAnswer: "-", isCorrect: true, isLastStep: false },
       { question, playerAnswer: question.answer, correctAnswer: question.answer, isCorrect: true, isLastStep: true },
