@@ -13,6 +13,7 @@ export type GraphShapeConfig = LineConfig | QuadraticConfig;
 
 class GraphMatchModel {
   private readonly graphEntries: GraphEntry[] = [];
+  private readonly equationKeys = new Set<string>();
 
   /** Adds a graph configuration and derives its equation text. */
   public addGraph(config: GraphShapeConfig): void;
@@ -25,10 +26,15 @@ class GraphMatchModel {
     const equation = typeof configOrEquation === 'string'
       ? configOrEquation
       : equationFromConfig(config);
+    const equationKey = equationFromConfig(config);
+    if (this.equationKeys.has(equationKey)) {
+      throw new Error(`Duplicate equation cannot be added: ${equation}`);
+    }
     const graph = config.slope !== undefined && config.yOffset !== undefined
       ? Graph.createLine(config as LineConfig)
       : Graph.createQuadratic(config as QuadraticConfig);
     this.graphEntries.push([equation, graph]);
+    this.equationKeys.add(equationKey);
   }
 
   /** Returns the model entries as `[equation, graph]` tuples. */
