@@ -1,25 +1,32 @@
 import Konva from "konva";
 import BasicMultistepPuzzle from "../puzzles/basic-multistep-puzzle";
+import type { PuzzleInputType } from "../puzzles/basic-multistep-puzzle";
+import PowerBoxPuzzle from "../puzzles/power-box-puzzle";
+import LaserMatchPuzzle from "../puzzles/laser-match-puzzle";
+import type Puzzle from "../puzzles/puzzle";
+import type { Room } from "../map/Room";
 import type { NotificationManager } from "../notification-manager/NotificationManager";
 import { EventType } from "../notification-manager/GameEvent";
-import type { Question, StepAnswer } from "../questions/Question";
+import type { StepAnswer } from "../questions/Question";
 import { WRONG_ANSWER_PENALTY_SECONDS } from "../score";
 import { MAX_HINTS_PER_ROOM } from "../score/ScoreModel";
 import type { RoomScreen as RoomScreenContract, Unsubscribe } from "./contracts";
 import { Hud } from "./Hud";
-import { DESIGN_WIDTH, fitLayer } from "./layout";
+import { DESIGN_HEIGHT, DESIGN_WIDTH, fitLayer } from "./layout";
 import { Listeners } from "./listeners";
 import { COLORS, createBackground, createButton, createText } from "./theme";
 
 /** The puzzle panel, centered at (x, y). */
 const PUZZLE = { x: DESIGN_WIDTH / 2, y: 470, width: 960, height: 480, spacing: 24, blockSize: 40 };
+const PANEL_COLOR = "#4b5563";
 /** How long the Correct / Incorrect line stays up. */
 export const FEEDBACK_MS = 1000;
 
 /**
- * The screen inside a Room: the Room name, the puzzle for its Question, an
- * Exit button and the HUD. Forwards every Step's Answer to `onAnswer`, and
- * shows a short Correct / Incorrect line when the Answer is judged.
+ * The screen inside a Room: the Room name, the Room's puzzle (multistep,
+ * Power Box or Laser Match), an Exit button and the HUD. Forwards every
+ * Step's Answer to `onAnswer`, and shows a short Correct / Incorrect line
+ * when the Answer is judged.
  */
 export class RoomScreen implements RoomScreenContract {
   readonly layer = new Konva.Layer();
@@ -30,8 +37,8 @@ export class RoomScreen implements RoomScreenContract {
   private readonly hud = new Hud();
   private readonly roomName: Konva.Text;
   private readonly feedback: Konva.Text;
-  private puzzle: BasicMultistepPuzzle | null = null;
-  private activeQuestion: Question | null = null;
+  private puzzle: Puzzle | null = null;
+  private activeRoom: Room | null = null;
   private usedHints = 0;
   private readonly hintModal = new Konva.Group({ visible: false, name: "hint-modal" });
   private readonly hintMessage: Konva.Text;
@@ -103,7 +110,7 @@ export class RoomScreen implements RoomScreenContract {
       label: "Back to Problem", fontSize: 39, name: "hint-back",
       onClick: () => {
         this.hintModal.hide();
-        this.puzzle?.setInteractionEnabled(true);
+        this.puzzle?.setInteractionEnabled?.(true);
         this.layer.batchDraw();
       },
     });
@@ -119,27 +126,18 @@ export class RoomScreen implements RoomScreenContract {
   }
 
   /**
-   * Shows the Room and builds a fresh puzzle from the Question, replacing
+   * Shows the Room and builds a fresh puzzle of the Room's kind, replacing
    * any previous one, so the Room restarts from Step 1.
    */
-  setQuestion(question: Question, roomName: string, usedHints: number = 0): void {
+  setRoom(room: Room, usedHints: number = 0): void {
     this.destroyPuzzle();
     this.clearFeedback();
-    this.roomName.text(roomName);
-    this.activeQuestion = question;
+    this.roomName.text(room.name);
+    this.activeRoom = room;
     this.usedHints = Math.max(0, Math.min(MAX_HINTS_PER_ROOM, usedHints));
     this.hintModal.hide();
 
-    const puzzle = new BasicMultistepPuzzle(question.prompt, {
-      layer: this.layer,
-      x: PUZZLE.x,
-      y: PUZZLE.y,
-      width: PUZZLE.width,
-      height: PUZZLE.height,
-      spacing: PUZZLE.spacing,
-      blockSize: PUZZLE.blockSize,
-      panelColor: "#4b5563",
-    });
+    const puzzle = this.buildPuzzle(room);
     puzzle.onAnswer = (answer) => this.answers.emit(answer);
     this.puzzle = puzzle;
     this.feedback.moveToTop();
@@ -163,22 +161,32 @@ export class RoomScreen implements RoomScreenContract {
   }
 
   private requestHint(): void {
-    if (!this.activeQuestion || this.hintModal.visible()) return;
+    if (!this.activeRoom || this.hintModal.visible()) return;
     if (this.usedHints >= MAX_HINTS_PER_ROOM) {
       this.hintMessage.text("You have used both hints for this room. Keep trying!");
     } else {
       this.usedHints += 1;
       this.hints.emit();
-      this.hintMessage.text(this.generateHint(this.activeQuestion, this.usedHints));
+      this.hintMessage.text(this.generateHint(this.activeRoom, this.usedHints));
     }
-    this.puzzle?.setInteractionEnabled(false);
+    this.puzzle?.setInteractionEnabled?.(false);
     this.hintModal.show();
     this.hintModal.moveToTop();
     this.layer.batchDraw();
   }
 
-  private generateHint(question: Question, hintNumber: number): string {
-    const expression = question.prompt;
+  private generateHint(room: Room, hintNumber: number): string {
+    if (room.puzzle.type === "laser") {
+      return hintNumber === 1
+        ? "Compare each equation's slope with the direction and steepness of the graphs."
+        : "Set x to zero to find the y-intercept, then check another point on the graph.";
+    }
+    if (room.puzzle.type === "powerBox") {
+      return hintNumber === 1
+        ? "Solve each wire's equation for x, then connect it to the matching value."
+        : "Undo addition or subtraction first, then multiplication or division. Substitute the matching value back into its equation to check it.";
+    }
+    const expression = room.question.prompt;
     if (hintNumber === 1) {
       const division = expression.match(/x\s*\/\s*(\d+)/i);
       if (division) return `${expression}\n\nTo isolate x, try multiplying both sides by ${division[1]}.`;
@@ -196,9 +204,43 @@ export class RoomScreen implements RoomScreenContract {
   hide(): void {
     this.destroyPuzzle();
     this.clearFeedback();
-    this.activeQuestion = null;
+    this.activeRoom = null;
     this.hintModal.hide();
     this.layer.hide();
+  }
+
+  private buildPuzzle(room: Room): Puzzle {
+    const panel = {
+      layer: this.layer,
+      x: PUZZLE.x,
+      y: PUZZLE.y,
+      width: PUZZLE.width,
+      height: PUZZLE.height,
+    };
+    const { puzzle } = room;
+    switch (puzzle.type) {
+      case "multistep": {
+        const inputType: PuzzleInputType = Math.random() < 0.5 ? "keypad" : "typed";
+        return new BasicMultistepPuzzle(room.question.prompt, {
+          ...panel,
+          spacing: PUZZLE.spacing,
+          blockSize: PUZZLE.blockSize,
+          panelColor: PANEL_COLOR,
+          inputType,
+        });
+      }
+      case "powerBox":
+        return new PowerBoxPuzzle(puzzle.pairs, {
+          ...panel,
+          backdrop: { width: DESIGN_WIDTH, height: DESIGN_HEIGHT },
+        });
+      case "laser":
+        return new LaserMatchPuzzle(puzzle.questions, { ...panel, panelColor: PANEL_COLOR });
+      default: {
+        const unknown: never = puzzle;
+        throw new Error(`Unknown Room puzzle: ${JSON.stringify(unknown)}`);
+      }
+    }
   }
 
   private destroyPuzzle(): void {

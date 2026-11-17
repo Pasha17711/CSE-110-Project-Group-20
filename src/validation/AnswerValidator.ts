@@ -1,7 +1,7 @@
 import { AnswerHistory } from "./AnswerHistory";
 import type { NotificationManager } from "../notification-manager/NotificationManager";
 import { EventType } from "../notification-manager/GameEvent";
-import type { Question, StepAnswer } from "../questions/Question";
+import { solvesRoom, type Question, type StepAnswer } from "../questions/Question";
 import type { RoomKind } from "../map/Room";
 
 /**
@@ -19,16 +19,17 @@ export class AnswerValidator {
 
     /**
      * Incorrect → Incorrect (the score takes the time penalty).
-     * Correct last Step → RoomSolved, then Correct.
-     * Correct earlier Step → Correct only. Returns whether it was correct.
+     * Correct Answer that solves the Room (see `solvesRoom`) → RoomSolved, then Correct.
+     * Any other correct Answer → Correct only. Returns whether it was correct.
+     * `question` is the Question the Answer is recorded under.
+     * `roomId` is required so scoring applies that Room's hint deductions.
      */
-    validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind, roomId?: string): boolean {
+    validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind,
+        roomId: string, stepNumber?: number): boolean {
         const isCorrect = answer.playerAnswer.trim() === answer.correctAnswer.trim();
 
-        if (isCorrect && answer.isLastStep) {
-            this.notifications.send(roomId
-                ? { eventType: EventType.RoomSolved, roomKind: kind, roomId }
-                : { eventType: EventType.RoomSolved, roomKind: kind });
+        if (isCorrect && solvesRoom(answer)) {
+            this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind, roomId });
         }
 
         this.notifications.send({
@@ -41,6 +42,8 @@ export class AnswerValidator {
             correctAnswer: answer.correctAnswer,
             isCorrect,
             isLastStep: answer.isLastStep,
+            stepPrompt: answer.stepPrompt,
+            ...(stepNumber !== undefined ? { stepNumber } : {}),
         });
 
         return isCorrect;

@@ -18,22 +18,25 @@ The constructor takes:
 - `history`: The `AnswerHistory` to record into.
 - `notifications`: The `NotificationManager` to send events through.
 
-The `validateAnswer()` method accepts three parameters:
+The `validateAnswer()` method accepts four required parameters and an optional step number:
 
-- `question`: The `Question` the Room is asking.
+- `question`: The `Question` being answered (one per wire or graph in matching puzzles).
 - `answer`: A `StepAnswer` from the puzzle:
   - `playerAnswer`: What the player submitted for this Step.
   - `correctAnswer`: The correct answer for this Step.
   - `isLastStep`: Whether this Step solves the Question.
+  - `solvesRoom`: Whether this answer completes the whole puzzle; defaults to `isLastStep`.
 - `kind`: The `RoomKind` (`"main"` or `"bonus"`) of the Room being solved.
+- `roomId`: The required Room ID, used to apply that room's hint deductions.
+- `stepNumber` (optional): The step within this Question, recorded for answer review.
 
 It returns whether the Answer was correct. Leading and trailing whitespace is ignored.
 
 | Answer                  | Events sent                          | What the score does   |
 | ----------------------- | ------------------------------------ | --------------------- |
 | Incorrect (any Step)    | `Incorrect`                          | time penalty          |
-| Correct, last Step      | `RoomSolved` `{ roomKind }`, `Correct` | money + correct answer |
-| Correct, earlier Step   | `Correct`                            | nothing               |
+| Correct, solves Room    | `RoomSolved` `{ roomKind, roomId }`, `Correct` | money + correct answer |
+| Correct, unfinished Room   | `Correct`                            | nothing               |
 
 Every Answer, correct or not, is recorded in `AnswerHistory`.
 
@@ -49,6 +52,7 @@ validator.validateAnswer(
     question,
     { playerAnswer: "-", correctAnswer: "-", isLastStep: false },
     "main",
+    "room_a",
 );
 
 // The last Step: the Room is Solved
@@ -56,6 +60,7 @@ validator.validateAnswer(
     question,
     { playerAnswer: "4", correctAnswer: "4", isLastStep: true },
     "main",
+    "room_a",
 );
 ```
 

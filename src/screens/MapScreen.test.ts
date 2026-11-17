@@ -5,19 +5,31 @@ vi.mock("konva", () => import("./testing/fakeKonva"));
 import type Konva from "konva";
 import { MapScreen } from "./MapScreen";
 import { Room } from "../map/Room";
+import { MapGrid } from "../map/MapGrid";
 import { formatMoney } from "../score";
 import { visibleTexts } from "./testing/fakeKonva";
 
 const question = { prompt: "x * 2 + 1 = 5", answer: "2" };
 
-function layout(): Room[] {
+function createRooms(): Room[] {
   return [
     new Room({ id: "room_a", name: "Room A", question }),
     new Room({ id: "room_b", name: "Room B", question }),
     new Room({ id: "room_c", name: "Room C", question, prerequisites: ["room_a", "room_b"] }),
-    new Room({ id: "room_X", name: "Room X", question, kind: "bonus" }),
+    new Room({ id: "room_x", name: "Room X", question, kind: "bonus" }),
     new Room({ id: "vault", name: "Vault", question, prerequisites: ["room_c"] }),
   ];
+}
+
+function createEasyGrid(rooms: Room[]): MapGrid {
+  const [roomA, roomB, roomC, roomX, vault] = rooms;
+  const grid = new MapGrid(3, 3);
+  grid.placeRoom(roomA, 0, 0, 1, 1);
+  grid.placeRoom(roomB, 0, 1, 1, 1);
+  grid.placeRoom(vault, 0, 2, 1, 2); // 2 rows tall
+  grid.placeRoom(roomC, 2, 0, 2, 1, { visualColSpan: 1.5 });
+  grid.placeRoom(roomX, 2, 2, 1, 1);
+  return grid;
 }
 
 describe("MapScreen", () => {
@@ -26,6 +38,12 @@ describe("MapScreen", () => {
   function button(id: string): Konva.Group {
     const node = screen.layer.findOne<Konva.Group>(`.room-button-${id}`);
     if (!node) throw new Error(`no button for ${id}`);
+    return node;
+  }
+
+  function floor(id: string): Konva.Rect {
+    const node = screen.layer.findOne<Konva.Rect>(`.floor-${id}`);
+    if (!node) throw new Error(`no floor for ${id}`);
     return node;
   }
 
@@ -43,26 +61,69 @@ describe("MapScreen", () => {
   });
 
   it("draws locked Rooms as locked and Solved Rooms as Solved", () => {
-    screen.setRooms(layout(), new Set(["room_a"]));
+    const rooms = createRooms();
+    const grid = createEasyGrid(rooms);
+
+    screen.setGrid(grid, new Set(["room_a"]));
 
     expect(state("room_a")).toBe("solved");
     expect(state("room_b")).toBe("open");
     expect(state("room_c")).toBe("locked");
-    expect(state("room_X")).toBe("open");
+    expect(state("room_x")).toBe("open");
     expect(state("vault")).toBe("locked");
     expect(button("room_a").findOne(".solved-label")).toBeDefined();
     expect(screen.layer.find(".lock")).toHaveLength(2);
   });
 
+  it("sizes rooms using visualColSpan/visualRowSpan and centers the button inside visual bounds", () => {
+      const rooms = createRooms();
+      const grid = createEasyGrid(rooms);
+
+      screen.setGrid(grid, new Set());
+
+      // 3x3 grid inside GRID_AREA (width: 1207, height: 737, gap: 16)
+      // tileWidth = Math.floor((1207 - 32) / 3) = 391
+      // tileHeight = Math.floor((737 - 32) / 3) = 235
+      const tileWidth = Math.floor((1207 - 2 * 16) / 3);
+      const tileHeight = Math.floor((737 - 2 * 16) / 3);
+
+      // Room C has colSpan: 2, visualColSpan: 1.5
+      const roomCFloor = floor("room_c");
+      const expectedCWidth = 1.5 * tileWidth + (1.5 - 1) * 16;
+      expect(roomCFloor.width()).toBe(expectedCWidth);
+
+      const roomCButton = button("room_c");
+      const expectedCButtonX = roomCFloor.x() + (expectedCWidth - 191) / 2;
+      expect(roomCButton.x()).toBe(expectedCButtonX);
+
+      // Vault has rowSpan: 2 and no visual override -> uses full 2-row height
+      const vaultFloor = floor("vault");
+      const expectedVaultHeight = 2 * tileHeight + 16;
+      expect(vaultFloor.height()).toBe(expectedVaultHeight);
+    });
+
+  it("redraws from scratch on each setGrid call", () => {
+      const rooms = createRooms();
+      const grid = createEasyGrid(rooms);
+
+      screen.setGrid(grid, new Set());
+      screen.setGrid(grid, new Set());
+
+      expect(screen.layer.find(".room-button-room_a")).toHaveLength(1);
+    });
+
   it("unlocks a Room once its prerequisites are Solved", () => {
-    screen.setRooms(layout(), new Set(["room_a", "room_b"]));
+    const rooms = createRooms();
+    const grid = createEasyGrid(rooms);
+
+    screen.setGrid(grid, new Set(["room_a", "room_b"]));
 
     expect(state("room_c")).toBe("open");
     expect(state("vault")).toBe("locked");
   });
 
   it("labels Rooms from Room.name", () => {
-    const rooms = layout();
+    const rooms = createRooms();
     rooms[0] = new Room({ id: "room_a", name: "Lobby", question });
 
     screen.setRooms(rooms, new Set());
@@ -70,17 +131,13 @@ describe("MapScreen", () => {
     expect(button("room_a").findOne<Konva.Text>(".room-label")!.text()).toBe("Lobby");
   });
 
-  it("redraws from scratch on each setRooms", () => {
-    screen.setRooms(layout(), new Set());
-    screen.setRooms(layout(), new Set());
-
-    expect(screen.layer.find(".room-button-room_a")).toHaveLength(1);
-  });
-
   it("clicking a Room's button calls onRoomClick with its id", () => {
     const onRoomClick = vi.fn();
     screen.onRoomClick(onRoomClick);
-    screen.setRooms(layout(), new Set());
+    const rooms = createRooms();
+    const grid = createEasyGrid(rooms);
+
+    screen.setGrid(grid, new Set());
 
     button("room_b").fire("click");
     button("room_c").fire("tap");
@@ -89,7 +146,10 @@ describe("MapScreen", () => {
   });
 
   it("makes a Solved Room's button non-interactive", () => {
-    screen.setRooms(layout(), new Set(["room_a"]));
+    const rooms = createRooms();
+    const grid = createEasyGrid(rooms);
+
+    screen.setGrid(grid, new Set(["room_a"]));
 
     expect(button("room_a").listening()).toBe(false);
     expect(button("room_b").listening()).toBe(true);
@@ -98,7 +158,7 @@ describe("MapScreen", () => {
   it("stops calling onRoomClick once unsubscribed", () => {
     const onRoomClick = vi.fn();
     const unsubscribe = screen.onRoomClick(onRoomClick);
-    screen.setRooms(layout(), new Set());
+    screen.setRooms(createRooms(), new Set());
 
     unsubscribe();
     button("room_a").fire("click");
@@ -107,7 +167,9 @@ describe("MapScreen", () => {
   });
 
   it("showAccessDenied shows the tooltip with the missing prerequisite names", () => {
-    screen.setRooms(layout(), new Set());
+    const rooms = createRooms();
+    const grid = createEasyGrid(rooms);
+    screen.setGrid(grid, new Set());
 
     screen.showAccessDenied({
       roomId: "room_c",
@@ -120,13 +182,20 @@ describe("MapScreen", () => {
   });
 
   it("falls back to 'is locked' when no prerequisite is named", () => {
+    const rooms = createRooms();
+    const grid = createEasyGrid(rooms);
+    screen.setGrid(grid, new Set());
+
     screen.showAccessDenied({ roomId: "vault", roomName: "Vault", missingPrerequisiteIds: [], missingPrerequisiteNames: [] });
 
     expect(tooltip().text).toBe("Vault is locked.");
   });
 
   it("hides the tooltip on the next Room click and on setRooms", () => {
-    screen.setRooms(layout(), new Set());
+    const rooms = createRooms();
+    const grid = createEasyGrid(rooms);
+    screen.setGrid(grid, new Set());
+
     const payload = {
       roomId: "vault", roomName: "Vault", missingPrerequisiteIds: ["room_c"], missingPrerequisiteNames: ["Room C"],
     };
@@ -136,7 +205,7 @@ describe("MapScreen", () => {
     expect(tooltip().visible).toBe(false);
 
     screen.showAccessDenied(payload);
-    screen.setRooms(layout(), new Set());
+    screen.setGrid(grid, new Set());
     expect(tooltip().visible).toBe(false);
   });
 

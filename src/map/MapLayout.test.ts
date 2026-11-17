@@ -1,0 +1,196 @@
+import { describe, test, expect } from 'vitest';
+import { MapLayout } from './MapLayout';
+import { Difficulty } from '../score';
+import { PAIR_COUNT } from '../power-box/power-box-generator';
+import { LASER_PAIR_COUNT } from '../graph/graph-equation-generator';
+
+
+describe('MapLayout Tests', () => {
+
+    describe('Easy layout tests', () => {
+        test('creates a 2x3 grid with exactly 5 rooms', () => {
+            const layout = MapLayout.createLayout(Difficulty.Easy);
+
+            expect(layout.grid.rows).toBe(3);
+            expect(layout.grid.columns).toBe(3);
+            expect(layout.rooms).toHaveLength(5);
+        });
+
+        test('places rooms in the expected grid slots with null for the hallway', () => {
+            const layout = MapLayout.createLayout(Difficulty.Easy);
+            const { grid } = layout;
+
+            // Row 0: [Room A] [Room B] [Vault]
+            expect(grid.getRoomAt(0, 0)?.id).toBe('room_a');
+            expect(grid.getRoomAt(0, 1)?.id).toBe('room_b');
+            expect(grid.getRoomAt(0, 2)?.id).toBe('vault');
+
+            // Row 1: [null] [null] [Vault(spans down)]
+            expect(grid.getRoomAt(1, 0)).toBeNull();
+            expect(grid.getRoomAt(1, 1)).toBeNull();
+            expect(grid.getRoomAt(1, 2)?.id).toBe('vault');
+
+            // Row 2: [Room C] [Room C(spans right)] [Room X]
+            expect(grid.getRoomAt(2, 0)?.id).toBe('room_c');
+            expect(grid.getRoomAt(2, 1)?.id).toBe('room_c');
+            expect(grid.getRoomAt(2, 2)?.id).toBe('room_x');
+
+            // Verify integer grid occupancy + decoupled visual span on Room C
+            const placedC = grid.getAllRooms().find((p) => p.room.id === "room_c");
+            expect(placedC).toMatchObject({
+                row: 2,
+                column: 0,
+                colSpan: 2,
+                rowSpan: 1,
+                visualColSpan: 1.5,
+            });
+        });
+
+        test('configures Room C and Vault prerequisites correctly', () => {
+            const layout = MapLayout.createLayout(Difficulty.Easy);
+            const roomC = layout.rooms.find((r) => r.id === 'room_c');
+            const vault = layout.rooms.find((r) => r.id === 'vault');
+            const roomX = layout.rooms.find((r) => r.id === 'room_x');
+
+            expect(roomC?.prerequisites).toEqual(['room_a', 'room_b']);
+            expect(vault?.prerequisites).toEqual(['room_c']);
+            expect(roomX?.kind).toBe('bonus');
+        });
+    });
+
+    describe('Medium layout tests', () => {
+        test('creates a 3x3 grid with exactly 6 rooms', () => {
+            const layout = MapLayout.createLayout(Difficulty.Medium);
+
+            expect(layout.grid.rows).toBe(3);
+            expect(layout.grid.columns).toBe(3);
+            expect(layout.rooms).toHaveLength(6);
+        });
+
+        test('places rooms and open hallway tiles at the correct coordinates', () => {
+            const layout = MapLayout.createLayout(Difficulty.Medium);
+            const { grid } = layout;
+
+            // Row 0: [Room A] [Room B] [Vault]
+            expect(grid.getRoomAt(0, 0)?.id).toBe('room_a');
+            expect(grid.getRoomAt(0, 1)?.id).toBe('room_b');
+            expect(grid.getRoomAt(0, 2)?.id).toBe('vault');
+
+            // Row 1: [Room A(spans down)] [Room B(spans down)] [Vault(spans down)]
+            expect(grid.getRoomAt(1, 0)?.id).toBe('room_a');
+            expect(grid.getRoomAt(1, 1)?.id).toBe('room_b');
+            expect(grid.getRoomAt(1, 2)?.id).toBe('vault');
+
+            // Row 2: [Room C] [Room D] [Room X]
+            expect(grid.getRoomAt(2, 0)?.id).toBe('room_c');
+            expect(grid.getRoomAt(2, 1)?.id).toBe('room_d');
+            expect(grid.getRoomAt(2, 2)?.id).toBe('room_x');
+
+            const placedRooms = grid.getAllRooms();
+            expect(placedRooms.find((p) => p.room.id === "room_a")).toMatchObject({
+                colSpan: 1,
+                rowSpan: 2,
+                visualRowSpan: 1.3,
+            });
+            expect(placedRooms.find((p) => p.room.id === "room_b")).toMatchObject({
+                colSpan: 1,
+                rowSpan: 2,
+                visualColSpan: 0.9,
+                visualRowSpan: 1.3,
+            });
+            expect(placedRooms.find((p) => p.room.id === "room_d")).toMatchObject({
+                colSpan: 1,
+                rowSpan: 1,
+                visualColSpan: 0.9,
+            });
+        });
+
+        test('configures prerequisite requirements for Medium difficulty', () => {
+            const layout = MapLayout.createLayout(Difficulty.Medium);
+            const roomC = layout.rooms.find((r) => r.id === 'room_c');
+            const vault = layout.rooms.find((r) => r.id === 'vault');
+
+            expect(roomC?.prerequisites).toEqual(['room_a', 'room_b']);
+            expect(vault?.prerequisites).toEqual(['room_c', 'room_d']);
+        });
+    });
+
+    describe('Hard layout tests', () => {
+        test('creates a 3x4 grid with exactly 8 rooms', () => {
+        const layout = MapLayout.createLayout(Difficulty.Hard);
+
+        expect(layout.grid.rows).toBe(3);
+        expect(layout.grid.columns).toBe(4);
+        expect(layout.rooms).toHaveLength(8);
+        });
+
+        test('places rooms and open hallway slots across the 3x4 grid', () => {
+        const layout = MapLayout.createLayout(Difficulty.Hard);
+        const { grid } = layout;
+
+        // Row 0: [Room B] [Room C] [Room D] [Vault]
+        expect(grid.getRoomAt(0, 0)?.id).toBe('room_b');
+        expect(grid.getRoomAt(0, 1)?.id).toBe('room_c');
+        expect(grid.getRoomAt(0, 2)?.id).toBe('room_d');
+        expect(grid.getRoomAt(0, 3)?.id).toBe('vault');
+
+        // Row 1: [Room A] [null] [null] [Vault(spans down)]
+        expect(grid.getRoomAt(1, 0)?.id).toBe('room_a');
+        expect(grid.getRoomAt(1, 1)).toBeNull();
+        expect(grid.getRoomAt(1, 2)).toBeNull();
+        expect(grid.getRoomAt(1, 3)?.id).toBe('vault');
+
+        // Row 2: [Room Y] [Room E] [Room E(spans right)] [Room X]
+        expect(grid.getRoomAt(2, 0)?.id).toBe('room_y');
+        expect(grid.getRoomAt(2, 1)?.id).toBe('room_e');
+        expect(grid.getRoomAt(2, 2)?.id).toBe('room_e');
+        expect(grid.getRoomAt(2, 3)?.id).toBe('room_x');
+
+        const placedE = grid.getAllRooms().find((p) => p.room.id === "room_e");
+        expect(placedE).toMatchObject({
+            row: 2,
+            column: 1,
+            colSpan: 2,
+            rowSpan: 1,
+            visualColSpan: 1.5,
+        });
+
+    });
+
+        test('configures multi-branch prerequisites for Hard difficulty', () => {
+        const layout = MapLayout.createLayout(Difficulty.Hard);
+        const roomB = layout.rooms.find((r) => r.id === 'room_b');
+        const roomE = layout.rooms.find((r) => r.id === 'room_e');
+        const vault = layout.rooms.find((r) => r.id === 'vault');
+
+        expect(roomB?.prerequisites).toEqual(['room_a']);
+        expect(roomE?.prerequisites).toEqual(['room_b', 'room_c']);
+        expect(vault?.prerequisites).toEqual(['room_e', 'room_d']);
+        });
+    });
+
+    describe('Room puzzles', () => {
+        test.each([Difficulty.Easy, Difficulty.Medium, Difficulty.Hard])(
+            'Room B is the Power Box, Room C the Laser Match, the rest multistep (Difficulty %s)',
+            (difficulty) => {
+                const { rooms } = MapLayout.createLayout(difficulty);
+                const byId = new Map(rooms.map((r) => [r.id, r]));
+
+                const powerBox = byId.get('room_b')!;
+                if (powerBox.puzzle.type !== 'powerBox') throw new Error('room_b is not a Power Box');
+                expect(powerBox.puzzle.pairs).toHaveLength(PAIR_COUNT[difficulty]);
+                expect(powerBox.question).toBe(powerBox.puzzle.pairs[0].question);
+
+                const laser = byId.get('room_c')!;
+                if (laser.puzzle.type !== 'laser') throw new Error('room_c is not a Laser Match');
+                expect(laser.puzzle.questions).toHaveLength(LASER_PAIR_COUNT);
+                expect(laser.question).toBe(laser.puzzle.questions[0]);
+
+                for (const room of rooms.filter((r) => r.id !== 'room_b' && r.id !== 'room_c')) {
+                    expect(room.puzzle).toEqual({ type: 'multistep' });
+                }
+            },
+        );
+    });
+
+});

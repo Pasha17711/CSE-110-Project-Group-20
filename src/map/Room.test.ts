@@ -49,4 +49,13 @@ describe('Room Unit Tests', () => {
     expect(roomA.question).toBe(question);
   });
 
+  test('defaults to a multistep puzzle and keeps the puzzle it is given', () => {
+    const roomA = new Room({ id: 'room_a', name: 'Room A', question });
+    const pairs = [{ question }];
+    const roomB = new Room({ id: 'room_b', name: 'Room B', question, puzzle: { type: 'powerBox', pairs } });
+
+    expect(roomA.puzzle).toEqual({ type: 'multistep' });
+    expect(roomB.puzzle).toEqual({ type: 'powerBox', pairs });
+  });
+
 });

@@ -9,6 +9,7 @@ import { Difficulty, type LeaderboardEntry, type ScoreSnapshot } from "../score"
 import type { HeistResult } from "../game/Game";
 import { visibleTexts } from "./testing/fakeKonva";
 import { created, type FakeTextInput } from "./testing/fakeTextInput";
+import type { AnswerRecord } from "../validation/AnswerHistory";
 
 // Cases carried over from #28's GameResults tests (Asad).
 
@@ -75,6 +76,39 @@ describe("EndScreen", () => {
     screen.setResult(escaped(), []);
 
     expect((find("outcome") as Konva.Text).text()).toBe("Escaped!");
+    expect(nameBoxShown()).toBe(true);
+  });
+
+  it.each([[720, 450], [390, 844], [1920, 1080]])(
+    "keeps save, review and replay controls separate and inside a %i by %i stage",
+    (width, height) => {
+      screen = new EndScreen(width, height);
+      screen.setResult(escaped(), []);
+      const save = find("save");
+      const review = find("review-answers");
+      const replay = find("play-again");
+      const back = find("back-to-start");
+      const face = (control: Konva.Node) => (control as Konva.Group).findOne<Konva.Rect>(".face")!;
+      expect(save.x() + face(save).width()).toBeLessThan(review.x());
+      expect(review.y() + face(review).height() + 4).toBeLessThan(replay.y());
+      expect(replay.x() + face(replay).width()).toBeLessThan(back.x());
+      const scale = screen.layer.scale();
+      for (const control of [save, review, replay, back]) {
+        expect(screen.layer.x() + control.x() * scale.x).toBeGreaterThanOrEqual(0);
+        expect(screen.layer.y() + control.y() * scale.y).toBeGreaterThanOrEqual(0);
+        expect(screen.layer.x() + (control.x() + face(control).width()) * scale.x).toBeLessThanOrEqual(width);
+        expect(screen.layer.y() + (control.y() + face(control).height() + 4) * scale.y).toBeLessThanOrEqual(height);
+      }
+    },
+  );
+
+  it("hides name entry during answer review and restores it when review closes", () => {
+    screen.setResult(escaped(), []);
+    find("review-answers").fire("click");
+    expect(nameBoxShown()).toBe(false);
+    screen.show();
+    expect(nameBoxShown()).toBe(false);
+    find("close-review").fire("click");
     expect(nameBoxShown()).toBe(true);
   });
 
@@ -275,4 +309,295 @@ describe("EndScreen", () => {
 
     expect(onPlayAgain).not.toHaveBeenCalled();
   });
+
+
+  describe("Review Answers", () => {
+
+    function answer(
+        question: AnswerRecord["question"],
+        playerAnswer: string,
+        isCorrect: boolean,
+        isLastStep = true
+    ): AnswerRecord {
+        return {
+            question,
+            playerAnswer,
+            correctAnswer: question.answer,
+            isCorrect,
+            isLastStep
+        };
+    }
+
+    function openReview(history: AnswerRecord[] = []): void {
+        screen.setResult({ ...escaped(), history }, []);
+        find("review-answers").fire("click");
+    }
+
+    //Test 1: Modal should stay hidden until clicked
+    it("starts hidden and opens when Review Answers is clicked", () => {
+        screen.setResult(escaped(), []);
+
+        expect(find("review-modal").visible()).toBe(false);
+
+        find("review-answers").fire("click");
+
+        expect(find("review-modal").visible()).toBe(true);
+    });
+
+    //Test 2: Modal should close when button is clicked
+    it("closes the Review Answers modal", () => {
+    openReview();
+
+    expect(find("review-modal").visible()).toBe(true);
+
+    find("close-review").fire("click");
+
+    expect(find("review-modal").visible()).toBe(false);
+    });
+
+    //Test 3: Display question and first incorrect answer attempt
+    it("displays the question, player answer, and correct answer", () => {
+    const question = {
+        prompt: "3x + 2 = 17",
+        answer: "5"
+    };
+
+    openReview([answer(question, "4", false)]);
+
+    const texts = visibleTexts(screen.layer);
+
+    expect(texts).toContain("3x + 2 = 17");
+    expect(texts).toContain("Your attempt: 4");
+    expect(texts).toContain("Expected: 5");
+    expect(texts).toContain("Question 1 of 1");
+    expect(texts).toContain("Not solved");
+
+    //check one mistake card was created
+    expect((find("review-mistakes") as Konva.Group).getChildren()
+    ).toHaveLength(1);
+    });
+
+    //Test 4: Display correct status
+    it("shows Solved for a correctly answered question", () => {
+    const question = {
+        prompt: "6 + 2 = ?",
+        answer: "8"
+    };
+
+    openReview([answer(question, "8", true)]);
+
+    const texts = visibleTexts(screen.layer);
+
+
+    expect(texts).toContain("Solved");
+    expect(texts).toContain("No incorrect attempts!");
+    expect(texts).toContain("Question 1 of 1");
+
+    //no mistake cards should be created
+    expect((find("review-mistakes") as Konva.Group).getChildren()
+    ).toHaveLength(0);
+    });
+
+    //Test 5: Verify questions display in order and update their status
+    it("displays incorrect questions in order with their correct status", () => {
+    const correctQuestion = {
+        prompt: "2 + 6 = ?",
+        answer: "8"
+    };
+
+    const incorrectQuestion = {
+        prompt: "5 x 3 = ?",
+        answer: "15"
+    };
+
+    openReview([
+        answer(correctQuestion, "8", true),
+        answer(incorrectQuestion, "12", false)
+    ]);
+
+    // first question was solved correctly
+        let texts = visibleTexts(screen.layer);
+
+        expect(texts).toContain("2 + 6 = ?");
+        expect(texts).toContain("Solved");
+        expect(texts).toContain("Question 1 of 2");
+
+        expect(
+            (find("review-mistakes") as Konva.Group).getChildren()
+        ).toHaveLength(0);
+
+        // navigate to the incorrect question
+        find("review-next").fire("click");
+
+        texts = visibleTexts(screen.layer);
+
+        expect(texts).toContain("5 x 3 = ?");
+        expect(texts).toContain("Not solved");
+        expect(texts).toContain("Your attempt: 12");
+        expect(texts).toContain("Expected: 15");
+        expect(texts).toContain("Question 2 of 2");
+
+        expect((find("review-mistakes") as Konva.Group).getChildren()
+        ).toHaveLength(1);
+    });
+
+    //Test 6: Next and Previous Buttons
+    it("navigates between questions using Next and Previous", () => {
+    const q1 = { prompt: "1 + 1 = ?", answer: "2" };
+    const q2 = { prompt: "2 + 2 = ?", answer: "4" };
+    const q3 = { prompt: "3 + 3 = ?", answer: "6" };
+
+    openReview([
+        answer(q1, "2", true),
+        answer(q2, "4", true),
+        answer(q3, "6", true)
+    ]);
+
+    expect(visibleTexts(screen.layer)).toContain("Question 1 of 3");
+
+    find("review-next").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain("2 + 2 = ?");
+    expect(visibleTexts(screen.layer)).toContain("Question 2 of 3");
+
+    find("review-previous").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain("1 + 1 = ?");
+    expect(visibleTexts(screen.layer)).toContain("Question 1 of 3");
+  });
+
+  //Test 7: Can't navigate if out of bounds
+  it("does not navigate before the first or after the last question", () => {
+    const q1 = { prompt: "1 + 1 = ?", answer: "2" };
+    const q2 = { prompt: "2 + 2 = ?", answer: "4" };
+
+    openReview([
+        answer(q1, "2", true),
+        answer(q2, "4", true)
+    ]);
+
+    find("review-previous").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain("Question 1 of 2");
+
+    find("review-next").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain("Question 2 of 2");
+
+    find("review-next").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain("Question 2 of 2");
+    expect(visibleTexts(screen.layer)).toContain("2 + 2 = ?");
+});
+
+//Test 8: Intermediate steps should be displayed even if question is solved
+it("tracks intermediate mistakes when final answer is correct", () => {
+    const question = {
+      prompt: "3x + 2 = 17",
+      answer: "5"
+    };
+
+    openReview([
+      answer(question, "4", false, false),
+      answer(question, "5", true, false),
+      answer(question, "5", true, true)
+    ]);
+
+  const texts = visibleTexts(screen.layer);
+
+  expect(texts).toContain("3x + 2 = 17");
+  expect(texts).toContain("Solved with mistakes");
+  expect(texts).toContain("Question 1 of 1");
+
+  // earlier mistake should still be visible
+  expect(texts).toContain("Your attempt: 4");
+  expect(texts).toContain("Expected: 5");
+  expect(texts).toContain("Total incorrect attempts: 1");
+
+  expect((find("review-mistakes") as Konva.Group).getChildren()
+  ).toHaveLength(1);
+});
+
+//Test 9: Repeated incorrect attempts should be grouped into one card
+it("groups repeated mistakes for same step", () => {
+    const question = {
+        prompt: "3x + 2 = 17",
+        answer: "5"
+    };
+
+    openReview([
+        answer(question, "4", false),
+        answer(question, "3", false),
+        answer(question, "5", true)
+    ]);
+
+    const texts = visibleTexts(screen.layer);
+
+    expect(texts).toContain("Question 1 of 1");
+    expect(texts).toContain("Solved with mistakes");
+
+    //verify only first incorrect attempt is displayed
+    expect(texts).toContain("Your attempt: 4");
+    expect(texts).not.toContain("Your attempt: 3");
+    expect(texts).toContain("Expected: 5");
+
+    // Both incorrect submissions should be counted
+    expect(texts).toContain("Total incorrect attempts: 2");
+
+    // Only one card because both mistakes occurred on Step 1
+    expect((find("review-mistakes") as Konva.Group).getChildren()
+    ).toHaveLength(1);
+});
+
+//Test 10: Empty History
+it("handles an empty answer history", () => {
+    openReview([]);
+
+    const texts = visibleTexts(screen.layer);
+
+    expect(texts).toContain("No answers to review.");
+    expect(texts).toContain("Question 0 of 0");
+    expect(texts).not.toContain("Correct!");
+    expect(texts).not.toContain("Incorrect");
+
+    find("review-next").fire("click");
+    find("review-previous").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain(
+        "No answers to review."
+    );
+});
+
+//Test 11: New Game Reset Review
+it("resets the review when a new game result arrives", () => {
+    const q1 = { prompt: "First question", answer: "2" };
+    const q2 = { prompt: "Second question", answer: "4" };
+    const q3 = { prompt: "New game question", answer: "6" };
+
+    openReview([
+        answer(q1, "2", true),
+        answer(q2, "4", true)
+    ]);
+
+    find("review-next").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain("Question 2 of 2");
+
+    // New Game
+    screen.setResult({
+        ...escaped(),
+        history: [answer(q3, "6", true)]
+    }, []);
+
+    expect(find("review-modal").visible()).toBe(false);
+
+    find("review-answers").fire("click");
+
+    expect(visibleTexts(screen.layer)).toContain("New game question");
+    expect(visibleTexts(screen.layer)).toContain("Question 1 of 1");
+});
+
+
+});
+
 });
