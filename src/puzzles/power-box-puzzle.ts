@@ -1,5 +1,6 @@
 import type Konva from "konva";
-import type { Question, StepAnswer } from "../questions/Question";
+import type { StepAnswer } from "../questions/Question";
+import type Puzzle from "./puzzle";
 import { shuffledOrder, type PowerBoxPair, type RandomFn } from "../power-box/power-box-generator";
 import { PowerBoxModel } from "../power-box/power-box-model";
 import { PowerBoxView } from "../power-box/power-box-view";
@@ -29,13 +30,14 @@ export interface PowerBoxPuzzleOptions {
  * shape as BasicMultistepPuzzle (`onAnswer`, `onPuzzleFinished`, `destroy`),
  * so the Room Screen can use either one.
  */
-class PowerBoxPuzzle {
+class PowerBoxPuzzle implements Puzzle {
   /**
-   * Called with every wire the player tries (each one is a Step), and the
-   * Question that wire belongs to. The power box has several Questions, so the
-   * Room's own Question is not the one being answered.
+   * Called with every wire the player tries (each one is a Step).
+   * `answer.question` is the Question that wire belongs to: the power box has
+   * several Questions, so the Room's own Question is not the one being
+   * answered. `answer.solvesRoom` is true for the wire that finishes the box.
    */
-  public onAnswer?: (answer: StepAnswer, question: Question) => void;
+  public onAnswer?: (answer: StepAnswer) => void;
 
   /** Called once when every wire is connected (security offline). */
   public onPuzzleFinished?: (solved: boolean) => void;
@@ -58,7 +60,7 @@ class PowerBoxPuzzle {
 
     this.view = new PowerBoxView(options.layer, options);
     this.controller = new PowerBoxController(model, this.view);
-    this.controller.onAnswer = (answer, question) => this.onAnswer?.(answer, question);
+    this.controller.onAnswer = (answer) => this.onAnswer?.(answer);
     this.controller.onFinished = () => this.onPuzzleFinished?.(true);
   }
 

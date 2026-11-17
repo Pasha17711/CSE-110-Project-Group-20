@@ -37,6 +37,21 @@ describe("PowerBoxPuzzle", () => {
     expect(equations()).toEqual(before);
   });
 
+  it("forwards every wire as a StepAnswer that names the wire's Question", () => {
+    const layer = new Konva.Layer();
+    const puzzle = new PowerBoxPuzzle(PAIRS, { layer, ...OPTIONS, random: () => 0 });
+    const onAnswer = vi.fn();
+    puzzle.onAnswer = onAnswer;
+    // Reach the controller through the view's plug callbacks.
+    const controller = (puzzle as unknown as { controller: { selectLeft(i: number): void; tryRight(i: number): void } }).controller;
+
+    controller.selectLeft(1);
+    controller.tryRight(0);
+
+    expect(onAnswer).toHaveBeenCalledOnce();
+    expect(onAnswer.mock.calls[0][0]).toMatchObject({ question: PAIRS[1].question, isLastStep: true, solvesRoom: false });
+  });
+
   it("rejects a bad panel size", () => {
     const layer = new Konva.Layer();
     expect(() => new PowerBoxPuzzle(PAIRS, { layer, ...OPTIONS, width: 0 })).toThrow();

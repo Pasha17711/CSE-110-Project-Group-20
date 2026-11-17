@@ -30,8 +30,8 @@ const puzzle = new PowerBoxPuzzle(pairs, {
   width: 960, height: 520,
   backdrop: { width: DESIGN_WIDTH, height: DESIGN_HEIGHT }, // optional server-room scene
 });
-puzzle.onAnswer = (answer, question) => {
-  /* send to AnswerValidator. Use `question`, not the Room's Question:
+puzzle.onAnswer = (answer) => {
+  /* send to AnswerValidator. Use `answer.question`, not the Room's Question:
      a power box has one Question per wire. */
 };
 puzzle.onPuzzleFinished = () => { /* every wire connected */ };
@@ -39,13 +39,16 @@ puzzle.onPuzzleFinished = () => { /* every wire connected */ };
 puzzle.destroy();
 ```
 
-Each wire the player tries is one **Step** (`StepAnswer`):
+Each wire the player tries is one **Step** (`StepAnswer`). Each wire is its
+own Question of one Step, so every Answer has `isLastStep: true` and names
+its wire's Question in `answer.question`. Only the wire that finishes the box
+has `solvesRoom: true`:
 
 | Player does | StepAnswer | Through AnswerValidator |
 |---|---|---|
 | Connects a wrong answer | `playerAnswer` ≠ `correctAnswer` | `Incorrect` → −60 s |
-| Connects a right answer (not the last) | equal, `isLastStep: false` | `Correct` |
-| Connects the last wire | equal, `isLastStep: true` | `RoomSolved` → money, then `Correct` |
+| Connects a right answer (not the last) | equal, `solvesRoom: false` | `Correct` |
+| Connects the last wire | equal, `solvesRoom: true` | `RoomSolved` → money, then `Correct` |
 
 The player can **click** a left jack and then a right jack, or **drag** a
 cable from left to right:

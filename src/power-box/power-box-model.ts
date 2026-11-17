@@ -1,6 +1,9 @@
 import type { Question, StepAnswer } from "../questions/Question";
 import type { PowerBoxPair } from "./power-box-generator";
 
+/** What each wire asks, shown with a wrong wire on the Review Answers screen. */
+export const POWER_BOX_STEP_PROMPT = "Wire the equation to its value of x";
+
 /** What happened when the player connected a wire. */
 export interface MatchResult {
   correct: boolean;
@@ -16,8 +19,9 @@ export interface MatchResult {
  *
  * Left side = each Question's equation (prompt), in `pairs` order.
  * Right side = each Question's answer, in `rightOrder` order (indexes into `pairs`).
- * Each connection attempt is one Step. The Step that connects the last wire
- * is the last Step, which solves the Room.
+ * Each connection attempt is one Step, and each wire is a Question of one
+ * Step, so every Answer is that Question's last Step (`isLastStep`). The
+ * Answer that connects the last wire also solves the Room (`solvesRoom`).
  */
 export class PowerBoxModel {
   private readonly pairs: readonly PowerBoxPair[];
@@ -97,16 +101,20 @@ export class PowerBoxModel {
     // Only a correct match can finish the box. (With one wire left, the only
     // free left and right rows belong together, so a wrong try can't happen
     // there anyway; checking `correct` keeps that from depending on it.)
-    const isLastStep = correct && this.matchedCount === this.size - 1;
+    const solvesRoom = correct && this.matchedCount === this.size - 1;
     if (correct) this.matchedLeft.add(left);
 
+    const question = this.pairs[left].question;
     return {
       correct,
-      question: this.pairs[left].question,
+      question,
       answer: {
         playerAnswer: this.answers()[right],
-        correctAnswer: this.pairs[left].question.answer.trim(),
-        isLastStep,
+        correctAnswer: question.answer.trim(),
+        isLastStep: true,
+        stepPrompt: POWER_BOX_STEP_PROMPT,
+        question,
+        solvesRoom,
       },
     };
   }

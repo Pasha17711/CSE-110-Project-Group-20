@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { PowerBoxModel } from "./power-box-model";
+import { PowerBoxModel, POWER_BOX_STEP_PROMPT } from "./power-box-model";
 import type { PowerBoxPair } from "./power-box-generator";
 
 const PAIRS: PowerBoxPair[] = [
@@ -35,7 +35,11 @@ describe("PowerBoxModel", () => {
     expect(result).toEqual({
       correct: true,
       question: PAIRS[0].question,
-      answer: { playerAnswer: "5", correctAnswer: "5", isLastStep: false },
+      answer: {
+        playerAnswer: "5", correctAnswer: "5", isLastStep: true,
+        stepPrompt: POWER_BOX_STEP_PROMPT,
+        question: PAIRS[0].question, solvesRoom: false,
+      },
     });
     expect(box.isLeftMatched(0)).toBe(true);
     expect(box.isRightMatched(1)).toBe(true);
@@ -48,29 +52,38 @@ describe("PowerBoxModel", () => {
     expect(result).toEqual({
       correct: false,
       question: PAIRS[0].question,
-      answer: { playerAnswer: "8", correctAnswer: "5", isLastStep: false },
+      answer: {
+        playerAnswer: "8", correctAnswer: "5", isLastStep: true,
+        stepPrompt: POWER_BOX_STEP_PROMPT,
+        question: PAIRS[0].question, solvesRoom: false,
+      },
     });
     expect(box.isLeftMatched(0)).toBe(false);
     expect(box.isRightMatched(2)).toBe(false);
     expect(box.matchedCount).toBe(0);
   });
 
-  it("only the Step that connects the last wire is the last Step", () => {
-    expect(box.match(0, 1).answer.isLastStep).toBe(false);
-    expect(box.match(1, 2).answer.isLastStep).toBe(false);
+  it("every wire is the only Step of its own Question", () => {
+    expect(box.match(0, 2).answer.isLastStep).toBe(true);
+    expect(box.match(0, 1).answer.isLastStep).toBe(true);
+  });
+
+  it("only the Step that connects the last wire solves the Room", () => {
+    expect(box.match(0, 1).answer.solvesRoom).toBe(false);
+    expect(box.match(1, 2).answer.solvesRoom).toBe(false);
     expect(box.isFinished()).toBe(false);
 
-    expect(box.match(2, 0).answer.isLastStep).toBe(true);
+    expect(box.match(2, 0).answer.solvesRoom).toBe(true);
     expect(box.isFinished()).toBe(true);
   });
 
-  it("wrong tries before the end are never the last Step", () => {
+  it("wrong tries before the end never solve the Room", () => {
     box.match(0, 1);
-    expect(box.match(1, 0).answer.isLastStep).toBe(false);
+    expect(box.match(1, 0).answer.solvesRoom).toBe(false);
     expect(box.matchedCount).toBe(1);
   });
 
-  it("a wrong try is never the last Step, even with one wire left", () => {
+  it("a wrong try never solves the Room, even with one wire left", () => {
     box.match(0, 1);
     box.match(1, 2);
     // One wire left: wrong tries are only possible with free rows, and those
@@ -83,13 +96,13 @@ describe("PowerBoxModel", () => {
     twoLeft.match(0, 1);
     const wrong = twoLeft.match(1, 0);
     expect(wrong.correct).toBe(false);
-    expect(wrong.answer.isLastStep).toBe(false);
+    expect(wrong.answer.solvesRoom).toBe(false);
   });
 
   it("ignores spaces around an answer", () => {
     const spaced = new PowerBoxModel([{ question: { prompt: "x = 3", answer: " 3 " } }], [0]);
     expect(spaced.answers()).toEqual(["3"]);
-    expect(spaced.match(0, 0).answer).toEqual({ playerAnswer: "3", correctAnswer: "3", isLastStep: true });
+    expect(spaced.match(0, 0).answer).toMatchObject({ playerAnswer: "3", correctAnswer: "3", solvesRoom: true });
   });
 
   it("questionAt() gives the Question on a left row", () => {
