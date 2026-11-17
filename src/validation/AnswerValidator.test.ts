@@ -69,6 +69,21 @@ describe("AnswerValidator", () => {
         expect(types()).toEqual([EventType.Incorrect]);
     });
 
+    it("solves the Room only on solvesRoom when a puzzle has several Questions", () => {
+        // A Power Box wire: the only Step of its own Question, but not the last wire.
+        validator.validateAnswer(question, { ...step("4", "4", true), solvesRoom: false }, "main");
+        expect(types()).toEqual([EventType.Correct]);
+
+        validator.validateAnswer(question, { ...step("4", "4", true), solvesRoom: true }, "main");
+        expect(types()).toEqual([EventType.Correct, EventType.RoomSolved, EventType.Correct]);
+    });
+
+    it("never solves the Room on a wrong Answer, even with solvesRoom", () => {
+        validator.validateAnswer(question, { ...step("5", "4", true), solvesRoom: true }, "main");
+
+        expect(types()).toEqual([EventType.Incorrect]);
+    });
+
     it("ignores extra whitespace", () => {
         const result = validator.validateAnswer(question, step(" 4 ", "4", true), "main");
 

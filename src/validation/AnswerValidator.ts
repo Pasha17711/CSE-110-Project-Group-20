@@ -1,7 +1,7 @@
 import { AnswerHistory } from "./AnswerHistory";
 import type { NotificationManager } from "../notification-manager/NotificationManager";
 import { EventType } from "../notification-manager/GameEvent";
-import type { Question, StepAnswer } from "../questions/Question";
+import { solvesRoom, type Question, type StepAnswer } from "../questions/Question";
 import type { RoomKind } from "../map/Room";
 
 /**
@@ -19,14 +19,15 @@ export class AnswerValidator {
 
     /**
      * Incorrect → Incorrect (the score takes the time penalty).
-     * Correct last Step → RoomSolved, then Correct.
-     * Correct earlier Step → Correct only. Returns whether it was correct.
+     * Correct Answer that solves the Room (see `solvesRoom`) → RoomSolved, then Correct.
+     * Any other correct Answer → Correct only. Returns whether it was correct.
+     * `question` is the Question the Answer is recorded under.
      */
     validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind,
         stepNumber?: number): boolean {
         const isCorrect = answer.playerAnswer.trim() === answer.correctAnswer.trim();
 
-        if (isCorrect && answer.isLastStep) {
+        if (isCorrect && solvesRoom(answer)) {
             this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind });
         }
 

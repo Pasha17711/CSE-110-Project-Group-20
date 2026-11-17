@@ -1,6 +1,6 @@
 import { NotificationManager } from "../notification-manager/NotificationManager";
 import { EventType } from "../notification-manager/GameEvent";
-import type { StepAnswer } from "../questions/Question";
+import { solvesRoom, type Question, type StepAnswer } from "../questions/Question";
 import { ScoreController, ScoreModel } from "../score";
 import type { Difficulty, ScoreSnapshot } from "../score";
 import { MapController } from "../map/MapController";
@@ -58,7 +58,13 @@ export class Game {
   private answering = false;
   private pendingOutcome: HeistOutcome | null = null;
 
-  private currentStepNumber = 1;
+  /**
+   * The Step each Question in the current Room is on, from 1. A Power Box or
+   * Laser Room has one Question per pair, so each keeps its own count.
+   * Cleared on entering a Room, since the puzzle restarts from Step 1.
+   */
+  private readonly stepNumbers = new Map<Question, number>();
+
   constructor(difficulty: Difficulty, deps: GameDeps) {
     this.notifications = deps.notifications;
     this.screens = deps.screens;
@@ -143,7 +149,7 @@ export class Game {
   private handleScreenChange(event: SwitchMapScreen): void {
     if (this.ended) return;
     if (event.room) {
-      this.currentStepNumber = 1;
+      this.stepNumbers.clear();
       this.roomScreen.setQuestion(event.room.question, event.room.name);
       this.updateHud();
       this.screens.show("room");
@@ -161,19 +167,16 @@ export class Game {
     // The validator sends RoomSolved/Correct/Incorrect (the score listens to
     // them) and records the Answer. A wrong Answer can run the clock out in the middle of this call,
     // so onTimeUp only flags the ending until the Answer has been recorded.
+    const question = answer.question ?? room.question;
+    const stepNumber = this.stepNumbers.get(question) ?? 1;
     this.answering = true;
     let correct: boolean;
     try {
-      correct = this.validator.validateAnswer(room.question, answer, room.kind,
-        this.currentStepNumber);
-        if (correct) {
-          this.currentStepNumber++;
-          }
+      correct = this.validator.validateAnswer(question, answer, room.kind, stepNumber);
+      if (correct) this.stepNumbers.set(question, stepNumber + 1);
     } finally {
       this.answering = false;
     }
-
-    
 
     // The clock can also hit zero between ticks; a solve is then rejected by
     // the score, so the Heist ends Caught rather than Escaped.
@@ -181,7 +184,7 @@ export class Game {
       this.end("caught");
       return;
     }
-    if (!correct || !answer.isLastStep) return; // stay in the Room
+    if (!correct || !solvesRoom(answer)) return; // stay in the Room
 
     if (room.id === VAULT_ID) {
       this.map.solveVault(VAULT_ID);

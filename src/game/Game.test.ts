@@ -418,6 +418,50 @@ describe("Game", () => {
     expect(game.getResult().snapshot.flawless).toBe(false);
   });
 
+  it("records an Answer under its own Question, and solves the Room only on solvesRoom", () => {
+    game.start();
+    mapScreen.click("room_a");
+    const wireOne: Question = { prompt: "x + 1 = 3", answer: "2" };
+    const wireTwo: Question = { prompt: "x + 2 = 7", answer: "5" };
+
+    roomScreen.submit({ playerAnswer: "5", correctAnswer: "2", isLastStep: true, question: wireOne, solvesRoom: false });
+    roomScreen.submit({ playerAnswer: "2", correctAnswer: "2", isLastStep: true, question: wireOne, solvesRoom: false });
+    expect(shown[shown.length - 1]).toBe("room");
+    expect(count(EventType.RoomSolved)).toBe(0);
+
+    roomScreen.submit({ playerAnswer: "5", correctAnswer: "5", isLastStep: true, question: wireTwo, solvesRoom: true });
+    expect(count(EventType.RoomSolved)).toBe(1);
+    expect(mapScreen.solved).toEqual(["room_a"]);
+    expect(shown[shown.length - 1]).toBe("map");
+
+    enterAndSolve("room_b");
+    enterAndSolve("room_c");
+    enterAndSolve(VAULT_ID);
+    const { history } = game.getResult();
+    // Each wire is Step 1 of its own Question.
+    expect(history.slice(0, 3)).toMatchObject([
+      { question: wireOne, isCorrect: false, stepNumber: 1 },
+      { question: wireOne, isCorrect: true, stepNumber: 1 },
+      { question: wireTwo, isCorrect: true, stepNumber: 1 },
+    ]);
+  });
+
+  it("counts Steps per Question and restarts them on re-entering the Room", () => {
+    game.start();
+    mapScreen.click("room_a");
+    const question = mapScreen.room("room_a").question;
+    roomScreen.submit(CORRECT_PICK);
+    roomScreen.leave();
+    mapScreen.click("room_a");
+    roomScreen.submit(CORRECT_PICK);
+    roomScreen.submit(lastStep(question));
+    enterAndSolve("room_b");
+    enterAndSolve("room_c");
+    enterAndSolve(VAULT_ID);
+
+    expect(game.getResult().history.slice(0, 3).map((r) => r.stepNumber)).toEqual([1, 1, 2]);
+  });
+
   it("ignores Answers and clicks after the Heist ends and never sends GameOver twice", () => {
     game.start();
     mapScreen.click("room_a");
