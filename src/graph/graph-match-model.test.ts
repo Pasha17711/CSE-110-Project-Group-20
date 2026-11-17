@@ -42,6 +42,29 @@ describe('GraphMatchModel', () => {
     ]);
   });
 
+  it('throws when an equation is added more than once', () => {
+    const model = new GraphMatchModel();
+    model.addGraph('y = 1 * x + 1');
+
+    expect(() => model.addGraph('y=1*x+1')).toThrow(/Duplicate equation/);
+    expect(model.graphs()).toHaveLength(1);
+  });
+
+  it('throws when a config duplicates an existing equation', () => {
+    const model = new GraphMatchModel();
+    model.addGraph('y = 1 * x + 1');
+
+    expect(() => model.addGraph({
+      minX: -3,
+      maxX: 3,
+      minY: -3,
+      maxY: 3,
+      slope: 1,
+      yOffset: 1,
+    })).toThrow(/Duplicate equation/);
+    expect(model.graphs()).toHaveLength(1);
+  });
+
   it('returns a defensive copy from graphs', () => {
     const model = new GraphMatchModel();
     model.addGraph('y = 1 * x + 1');
