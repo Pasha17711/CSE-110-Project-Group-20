@@ -30,8 +30,8 @@ const puzzle = new PowerBoxPuzzle(pairs, {
   width: 960, height: 520,
   backdrop: { width: DESIGN_WIDTH, height: DESIGN_HEIGHT }, // optional server-room scene
 });
-puzzle.onAnswer = (answer, question) => {
-  /* send to AnswerValidator. Use `question`, not the Room's Question:
+puzzle.onAnswer = (answer) => {
+  /* send to AnswerValidator. Use `answer.question`, not the Room's Question:
      a power box has one Question per wire. */
 };
 puzzle.onPuzzleFinished = () => { /* every wire connected */ };
@@ -39,13 +39,16 @@ puzzle.onPuzzleFinished = () => { /* every wire connected */ };
 puzzle.destroy();
 ```
 
-Each wire the player tries is one **Step** (`StepAnswer`):
+Each wire the player tries is one **Step** (`StepAnswer`). Each wire is its
+own Question of one Step, so every Answer has `isLastStep: true` and names
+its wire's Question in `answer.question`. Only the wire that finishes the box
+has `solvesRoom: true`:
 
 | Player does | StepAnswer | Through AnswerValidator |
 |---|---|---|
 | Connects a wrong answer | `playerAnswer` ≠ `correctAnswer` | `Incorrect` → −60 s |
-| Connects a right answer (not the last) | equal, `isLastStep: false` | `Correct` |
-| Connects the last wire | equal, `isLastStep: true` | `RoomSolved` → money, then `Correct` |
+| Connects a right answer (not the last) | equal, `solvesRoom: false` | `Correct` |
+| Connects the last wire | equal, `solvesRoom: true` | `RoomSolved` → money, then `Correct` |
 
 The player can **click** a left jack and then a right jack, or **drag** a
 cable from left to right:
@@ -84,22 +87,13 @@ On screen, `*` is shown as `·` (`formatMath` in
 multistep puzzle still shows `*`; it can switch to the same `formatMath`
 when its UI is updated, so both Rooms match.
 
-## Making it a Room type (for whoever wires up Rooms)
+## In the game
 
-Right now `RoomScreen.setQuestion` always builds a `BasicMultistepPuzzle`.
-To add the power box as a second kind of Room:
-
-1. Give each Room a puzzle kind, e.g. `puzzle: "multistep" | "powerBox"` in
-   `RoomConfig` / `ROOM_LAYOUT`.
-2. When the Heist's Rooms are made (where each Room gets its Question), call
-   `generatePairs(difficulty)` once for a power box Room and keep the pairs.
-3. In the Room Screen, build `new PowerBoxPuzzle(pairs, { layer, x, y, width, height })`
-   for a power box Room (the same panel spot as the multistep puzzle works),
-   and call `destroy()` when leaving, like the multistep puzzle.
-4. Forward `onAnswer(answer, question)` the same way, but pass that
-   `question` to `validateAnswer` instead of the Room's Question.
-5. The Room is Solved by the Step with `isLastStep: true`, exactly like the
-   multistep puzzle, so Game's ending logic doesn't change.
+Room B is a power box Room in every layout (`MapLayout.powerBoxRoom`). Its
+`Room.puzzle` is `{ type: "powerBox", pairs }`, made once per Heist with
+`generatePairs(difficulty)`. `RoomScreen.setRoom` builds the `PowerBoxPuzzle`
+with the server-room backdrop, and Game records each wire under
+`answer.question` and solves the Room on `solvesRoom`.
 
 ## Files
 

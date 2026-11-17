@@ -1,4 +1,4 @@
-import type { Question, StepAnswer } from "../questions/Question";
+import type { StepAnswer } from "../questions/Question";
 import type { PowerBoxModel } from "./power-box-model";
 import type { PowerBoxViewLike } from "./power-box-view";
 
@@ -13,8 +13,8 @@ import type { PowerBoxViewLike } from "./power-box-view";
  * security goes offline and `onFinished` fires.
  */
 export class PowerBoxController {
-  /** Every try, with the Question it was for (so history can show the right equation). */
-  onAnswer?: (answer: StepAnswer, question: Question) => void;
+  /** Every try. `answer.question` is the wire's Question (so history can show the right equation). */
+  onAnswer?: (answer: StepAnswer) => void;
   onFinished?: () => void;
 
   private readonly model: PowerBoxModel;
@@ -61,7 +61,7 @@ export class PowerBoxController {
     this.selected = null;
     this.view.setSelected(null);
 
-    this.onAnswer?.(result.answer, result.question);
+    this.onAnswer?.(result.answer);
     if (this.model.isFinished()) this.onFinished?.();
   }
 

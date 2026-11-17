@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("konva", () => import("./testing/fakeKonva"));
 vi.mock("../puzzles/basic-multistep-puzzle", () => import("./testing/fakePuzzle"));
+vi.mock("../puzzles/power-box-puzzle", async () =>
+  ({ default: (await import("./testing/fakePuzzle")).fakePuzzleOf("powerBox") }));
+vi.mock("../puzzles/laser-match-puzzle", async () =>
+  ({ default: (await import("./testing/fakePuzzle")).fakePuzzleOf("laser") }));
 
 import type Konva from "konva";
 import { RoomScreen, FEEDBACK_MS } from "./RoomScreen";
@@ -11,8 +15,10 @@ import { formatMoney, WRONG_ANSWER_PENALTY_SECONDS } from "../score";
 import type { StepAnswer } from "../questions/Question";
 import { visibleTexts } from "./testing/fakeKonva";
 import { created } from "./testing/fakePuzzle";
+import { Room } from "../map/Room";
 
 const question = { prompt: "x * 2 + 1 = 5", answer: "2" };
+const roomA = new Room({ id: "room_a", name: "Room A", question });
 const pick: StepAnswer = { playerAnswer: "-", correctAnswer: "-", isLastStep: false };
 
 describe("RoomScreen", () => {
@@ -35,18 +41,48 @@ describe("RoomScreen", () => {
     vi.useRealTimers();
   });
 
-  it("setQuestion shows the Room name and builds a puzzle from the prompt on its layer", () => {
-    screen.setQuestion(question, "Room A");
+  it("setRoom shows the Room name and builds a multistep puzzle from the prompt on its layer", () => {
+    screen.setRoom(roomA);
 
     expect(screen.layer.findOne<Konva.Text>(".room-name")!.text()).toBe("Room A");
     expect(created).toHaveLength(1);
-    expect(created[0].equation).toBe(question.prompt);
+    expect(created[0].type).toBe("multistep");
+    expect(created[0].source).toBe(question.prompt);
     expect(created[0].options.layer).toBe(screen.layer);
   });
 
-  it("a second setQuestion destroys the first puzzle and builds a fresh one", () => {
-    screen.setQuestion(question, "Room A");
-    screen.setQuestion(question, "Room A");
+  it("builds a Power Box from a Power Box Room's pairs, with the server-room backdrop", () => {
+    const pairs = [{ question }];
+    screen.setRoom(new Room({ id: "room_b", name: "Room B", question, puzzle: { type: "powerBox", pairs } }));
+
+    expect(created[0].type).toBe("powerBox");
+    expect(created[0].source).toBe(pairs);
+    expect(created[0].options).toMatchObject({ layer: screen.layer, backdrop: { width: 1440, height: 900 } });
+  });
+
+  it("builds a Laser Match from a Laser Room's Questions", () => {
+    const questions = [{ prompt: "y = x", answer: "y = 1 * x + 0" }];
+    screen.setRoom(new Room({ id: "room_c", name: "Room C", question, puzzle: { type: "laser", questions } }));
+
+    expect(created[0].type).toBe("laser");
+    expect(created[0].source).toBe(questions);
+    expect(created[0].options.layer).toBe(screen.layer);
+  });
+
+  it("forwards a Power Box Answer with its own Question untouched", () => {
+    const onAnswer = vi.fn();
+    screen.onAnswer(onAnswer);
+    screen.setRoom(new Room({ id: "room_b", name: "Room B", question, puzzle: { type: "powerBox", pairs: [{ question }] } }));
+    const wire: StepAnswer = { playerAnswer: "2", correctAnswer: "2", isLastStep: true, question, solvesRoom: true };
+
+    created[0].answer(wire);
+
+    expect(onAnswer).toHaveBeenCalledWith(wire);
+  });
+
+  it("a second setRoom destroys the first puzzle and builds a fresh one", () => {
+    screen.setRoom(roomA);
+    screen.setRoom(roomA);
 
     expect(created).toHaveLength(2);
     expect(created[0].destroyed).toBe(true);
@@ -54,7 +90,7 @@ describe("RoomScreen", () => {
   });
 
   it("hide() destroys the puzzle, so leaving loses Step progress", () => {
-    screen.setQuestion(question, "Room A");
+    screen.setRoom(roomA);
 
     screen.hide();
 
@@ -65,7 +101,7 @@ describe("RoomScreen", () => {
   it("forwards every puzzle Answer to onAnswer as a StepAnswer", () => {
     const onAnswer = vi.fn();
     screen.onAnswer(onAnswer);
-    screen.setQuestion(question, "Room A");
+    screen.setRoom(roomA);
     const last = { playerAnswer: "2", correctAnswer: "2", isLastStep: true };
 
     created[0].answer(pick);
@@ -77,7 +113,7 @@ describe("RoomScreen", () => {
   it("stops forwarding Answers once unsubscribed", () => {
     const onAnswer = vi.fn();
     screen.onAnswer(onAnswer)();
-    screen.setQuestion(question, "Room A");
+    screen.setRoom(roomA);
 
     created[0].answer(pick);
 
@@ -132,7 +168,7 @@ describe("RoomScreen", () => {
   it("selects keypad input when random value is below 0.5", () => {
     const random = vi.spyOn(Math, "random").mockReturnValue(0.25);
 
-    screen.setQuestion(question, "Room A");
+    screen.setRoom(roomA);
 
     expect(created[0].options.inputType).toBe("keypad");
 
@@ -143,7 +179,7 @@ describe("RoomScreen", () => {
   it("selects typed input when random value is above 0.5", () => {
     const random = vi.spyOn(Math, "random").mockReturnValue(0.75);
 
-    screen.setQuestion(question, "Room A");
+    screen.setRoom(roomA);
 
     expect(created[0].options.inputType).toBe("typed");
 

@@ -64,9 +64,9 @@ describe("PowerBoxController", () => {
     answers = [];
     questions = [];
     finished = vi.fn<() => void>();
-    controller.onAnswer = (answer, question) => {
+    controller.onAnswer = (answer) => {
       answers.push(answer);
-      questions.push(question);
+      questions.push(answer.question!);
     };
     controller.onFinished = finished;
   });
@@ -97,7 +97,7 @@ describe("PowerBoxController", () => {
 
     expect(view.connected).toEqual([[0, 1]]);
     expect(view.security).toEqual([1, 3]);
-    expect(answers).toEqual([{ playerAnswer: "5", correctAnswer: "5", isLastStep: false }]);
+    expect(answers).toMatchObject([{ playerAnswer: "5", correctAnswer: "5", solvesRoom: false }]);
     expect(questions).toEqual([PAIRS[0].question]);
     expect(view.selected).toBeNull();
   });
@@ -107,7 +107,7 @@ describe("PowerBoxController", () => {
 
     expect(view.wrong).toEqual([2]);
     expect(view.connected).toEqual([]);
-    expect(answers).toEqual([{ playerAnswer: "8", correctAnswer: "5", isLastStep: false }]);
+    expect(answers).toMatchObject([{ playerAnswer: "8", correctAnswer: "5", solvesRoom: false }]);
     expect(questions).toEqual([PAIRS[0].question]); // the equation the player was working on
     expect(view.selected).toBeNull();
   });
@@ -137,7 +137,7 @@ describe("PowerBoxController", () => {
 
     view.wire(2, 0);
 
-    expect(answers.map((a) => a.isLastStep)).toEqual([false, false, true]);
+    expect(answers.map((a) => a.solvesRoom)).toEqual([false, false, true]);
     expect(view.security).toEqual([3, 3]);
     expect(finished).toHaveBeenCalledTimes(1);
   });

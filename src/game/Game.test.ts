@@ -83,12 +83,13 @@ class FakeMapScreen implements MapScreen {
   }
 }
 
-/** RoomScreen fake: records the Question and HUD, and lets tests answer and exit. */
+/** RoomScreen fake: records the Room and HUD, and lets tests answer and exit. */
 class FakeRoomScreen implements RoomScreen {
   readonly layer = {} as Konva.Layer;
+  room: Room | null = null;
   question: Question | null = null;
   roomName = "";
-  setQuestionCalls = 0;
+  setRoomCalls = 0;
   hud: Hud | null = null;
   readonly answer = new Slot<[StepAnswer]>();
   readonly exit = new Slot<[]>();
@@ -96,10 +97,11 @@ class FakeRoomScreen implements RoomScreen {
   show(): void {}
   hide(): void {}
 
-  setQuestion(question: Question, roomName: string): void {
-    this.question = question;
-    this.roomName = roomName;
-    this.setQuestionCalls += 1;
+  setRoom(room: Room): void {
+    this.room = room;
+    this.question = room.question;
+    this.roomName = room.name;
+    this.setRoomCalls += 1;
   }
 
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void {
@@ -226,8 +228,17 @@ describe("Game", () => {
     mapScreen.click("room_a");
 
     expect(roomScreen.question).toBe(question);
-    expect(roomScreen.setQuestionCalls).toBe(2);
+    expect(roomScreen.setRoomCalls).toBe(2);
     expect(mapScreen.room("room_a").question).toBe(question);
+  });
+
+  it("hands the Room Screen the whole Room, so it can build that Room's kind of puzzle", () => {
+    game.start();
+
+    mapScreen.click("room_b");
+
+    expect(roomScreen.room).toBe(mapScreen.room("room_b"));
+    expect(roomScreen.room?.puzzle.type).toBe("powerBox");
   });
 
   it("clicking a locked Room shows access denied, without a screen change or the clock starting", () => {
@@ -329,11 +340,11 @@ describe("Game", () => {
   it("a Solved Room can't be re-entered", () => {
     game.start();
     enterAndSolve("room_a");
-    const setQuestionCalls = roomScreen.setQuestionCalls;
+    const setRoomCalls = roomScreen.setRoomCalls;
 
     mapScreen.click("room_a");
 
-    expect(roomScreen.setQuestionCalls).toBe(setQuestionCalls);
+    expect(roomScreen.setRoomCalls).toBe(setRoomCalls);
     expect(shown).toEqual(["map", "room", "map"]);
   });
 
@@ -416,6 +427,50 @@ describe("Game", () => {
       { question, playerAnswer: question.answer, correctAnswer: question.answer, isCorrect: true, isLastStep: true },
     ]);
     expect(game.getResult().snapshot.flawless).toBe(false);
+  });
+
+  it("records an Answer under its own Question, and solves the Room only on solvesRoom", () => {
+    game.start();
+    mapScreen.click("room_a");
+    const wireOne: Question = { prompt: "x + 1 = 3", answer: "2" };
+    const wireTwo: Question = { prompt: "x + 2 = 7", answer: "5" };
+
+    roomScreen.submit({ playerAnswer: "5", correctAnswer: "2", isLastStep: true, question: wireOne, solvesRoom: false });
+    roomScreen.submit({ playerAnswer: "2", correctAnswer: "2", isLastStep: true, question: wireOne, solvesRoom: false });
+    expect(shown[shown.length - 1]).toBe("room");
+    expect(count(EventType.RoomSolved)).toBe(0);
+
+    roomScreen.submit({ playerAnswer: "5", correctAnswer: "5", isLastStep: true, question: wireTwo, solvesRoom: true });
+    expect(count(EventType.RoomSolved)).toBe(1);
+    expect(mapScreen.solved).toEqual(["room_a"]);
+    expect(shown[shown.length - 1]).toBe("map");
+
+    enterAndSolve("room_b");
+    enterAndSolve("room_c");
+    enterAndSolve(VAULT_ID);
+    const { history } = game.getResult();
+    // Each wire is Step 1 of its own Question.
+    expect(history.slice(0, 3)).toMatchObject([
+      { question: wireOne, isCorrect: false, stepNumber: 1 },
+      { question: wireOne, isCorrect: true, stepNumber: 1 },
+      { question: wireTwo, isCorrect: true, stepNumber: 1 },
+    ]);
+  });
+
+  it("counts Steps per Question and restarts them on re-entering the Room", () => {
+    game.start();
+    mapScreen.click("room_a");
+    const question = mapScreen.room("room_a").question;
+    roomScreen.submit(CORRECT_PICK);
+    roomScreen.leave();
+    mapScreen.click("room_a");
+    roomScreen.submit(CORRECT_PICK);
+    roomScreen.submit(lastStep(question));
+    enterAndSolve("room_b");
+    enterAndSolve("room_c");
+    enterAndSolve(VAULT_ID);
+
+    expect(game.getResult().history.slice(0, 3).map((r) => r.stepNumber)).toEqual([1, 1, 2]);
   });
 
   it("ignores Answers and clicks after the Heist ends and never sends GameOver twice", () => {

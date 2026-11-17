@@ -100,3 +100,22 @@ view.destroy()
 ```
 
 `onMatch` reports the selected equation and the selected graph's model index. `solve` blinks twice and disables/fades the matched pair; `incorrect` blinks once and leaves the controls available.
+
+## Laser Match in the game
+
+Room C is a Laser Match Room in every layout. `generateLaserQuestions(difficulty)`
+(`graph-equation-generator.ts`) makes its 3 Questions once per Heist: all lines
+on Easy, one parabola on Medium, two on Hard, never two lines with the same
+slope. Each Question's `answer` is the equation `parseEquation` reads and its
+`prompt` is how it's shown (`formatGraphEquation`: `y = x² - 2`).
+
+```ts
+const puzzle = new LaserMatchPuzzle(generateLaserQuestions(Difficulty.Medium), {
+  layer, x, y, width: 960, height: 480,
+});
+puzzle.onAnswer = (answer) => {
+  // answer.question: that equation's Question
+  // answer.playerAnswer / correctAnswer: the shown equations of the picked / right graph
+  // answer.solvesRoom: true for the match that completes every pair
+};
+```

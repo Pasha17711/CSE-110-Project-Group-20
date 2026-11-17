@@ -1,5 +1,6 @@
 import type { Screen } from "./ScreenController";
-import type { Question, StepAnswer } from "../questions/Question";
+import type { StepAnswer } from "../questions/Question";
+import type { Room } from "../map/Room";
 import type { MapGrid } from "../map/MapGrid";
 import type { AccessDeniedPayload } from "../map/MapController";
 import type { AddEntryResult, Difficulty, LeaderboardEntry } from "../score";
@@ -29,8 +30,11 @@ export interface MapScreen extends Screen {
 }
 
 export interface RoomScreen extends Screen {
-  /** Builds a fresh puzzle, so the Room restarts from Step 1. */
-  setQuestion(question: Question, roomName: string): void;
+  /**
+   * Builds a fresh puzzle of the Room's kind (`room.puzzle`), so the Room
+   * restarts from Step 1. Reads the Room; never changes it.
+   */
+  setRoom(room: Room): void;
   /** Format with formatTime / formatMoney from score. */
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void;
   /** One call per Step's Answer, operation picks included. */

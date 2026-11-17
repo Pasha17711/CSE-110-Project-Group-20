@@ -1,14 +1,36 @@
 import { MapGrid } from "./MapGrid";
-import { Room } from "./Room";
+import { Room, type RoomConfig } from "./Room";
 import { Difficulty } from "../score";
 import { getQuestion } from "../questions/QuestionGenerator";
+import { generatePairs } from "../power-box/power-box-generator";
+import { generateLaserQuestions } from "../graph/graph-equation-generator";
+
+/** A Room's settings apart from its Question and puzzle, which the helpers below make. */
+type RoomBasics = Omit<RoomConfig, "question" | "puzzle">;
 
 export interface GeneratedMapLayout {
     grid: MapGrid;
     rooms: Room[];
 }
 
+/**
+ * Every layout uses the same puzzles: Room B is the Power Box, Room C the
+ * Laser Match, and every other Room (the Vault and Bonus Rooms included)
+ * is a multistep Room.
+ */
 export class MapLayout {
+
+    /** A Power Box Room: one Question per wire, made once per Heist. */
+    private static powerBoxRoom(basics: RoomBasics, difficulty: Difficulty): Room {
+        const pairs = generatePairs(difficulty);
+        return new Room({ ...basics, question: pairs[0].question, puzzle: { type: "powerBox", pairs } });
+    }
+
+    /** A Laser Match Room: one Question per equation/graph pair, made once per Heist. */
+    private static laserRoom(basics: RoomBasics, difficulty: Difficulty): Room {
+        const questions = generateLaserQuestions(difficulty);
+        return new Room({ ...basics, question: questions[0], puzzle: { type: "laser", questions } });
+    }
 
     public static createLayout(difficulty: Difficulty): GeneratedMapLayout {
         switch (difficulty) {
@@ -36,18 +58,16 @@ export class MapLayout {
             question: getQuestion(Difficulty.Easy),
         });
 
-        const roomB = new Room({
+        const roomB = this.powerBoxRoom({
             id: "room_b",
             name: "Room B",
-            question: getQuestion(Difficulty.Easy),
-        });
+        }, Difficulty.Easy);
 
-        const roomC = new Room({
+        const roomC = this.laserRoom({
             id: "room_c",
             name: "Room C",
-            question: getQuestion(Difficulty.Easy),
             prerequisites: ["room_a", "room_b"],
-        });
+        }, Difficulty.Easy);
 
         const vault = new Room({
             id: "vault",
@@ -86,18 +106,16 @@ export class MapLayout {
             question: getQuestion(Difficulty.Medium),
         });
 
-        const roomB = new Room({
+        const roomB = this.powerBoxRoom({
             id: "room_b",
             name: "Room B",
-            question: getQuestion(Difficulty.Medium),
-        });
+        }, Difficulty.Medium);
 
-        const roomC = new Room({
+        const roomC = this.laserRoom({
             id: "room_c",
             name: "Room C",
-            question: getQuestion(Difficulty.Medium),
             prerequisites: ["room_a", "room_b"],
-        });
+        }, Difficulty.Medium);
 
         const roomD = new Room({
             id: "room_d",
@@ -142,18 +160,16 @@ export class MapLayout {
             question: getQuestion(Difficulty.Hard),
         });
 
-        const roomB = new Room({
+        const roomB = this.powerBoxRoom({
             id: "room_b",
             name: "Room B",
-            question: getQuestion(Difficulty.Hard),
             prerequisites: ["room_a"],
-        });
+        }, Difficulty.Hard);
 
-        const roomC = new Room({
+        const roomC = this.laserRoom({
             id: "room_c",
             name: "Room C",
-            question: getQuestion(Difficulty.Hard),
-        });
+        }, Difficulty.Hard);
 
         const roomD = new Room({
             id: "room_d",

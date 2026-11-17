@@ -6,6 +6,7 @@ import MultistepSolverModel from '../multistep-solver/multistep-solver-model'
 import MultistepSolverView from '../multistep-solver/multistep-solver-view'
 import { TermOp } from '../multistep-solver/types'
 import type { StepAnswer } from '../questions/Question'
+import type Puzzle from './puzzle'
 import TextInput from '../text-input/text-input'
 import KeypadInput from '../text-input/keypad-input'
 
@@ -28,7 +29,7 @@ export interface BasicMultistepPuzzleOptions {
 }
 
 /** Self-contained composition of the multistep solver and its input controls. */
-class BasicMultistepPuzzle {
+class BasicMultistepPuzzle implements Puzzle {
   private static readonly DROP_ZONE_SIZE = 100
 
   private readonly options: BasicMultistepPuzzleOptions

@@ -1,17 +1,29 @@
 /**
- * A fake BasicMultistepPuzzle for screen tests, used with
- * `vi.mock("../puzzles/basic-multistep-puzzle", () => import("./testing/fakePuzzle"))`.
+ * Fake puzzles for screen tests. The default export stands in for
+ * BasicMultistepPuzzle; `fakePuzzleOf(type)` makes stand-ins for the others:
+ *
+ *   vi.mock("../puzzles/basic-multistep-puzzle", () => import("./testing/fakePuzzle"));
+ *   vi.mock("../puzzles/power-box-puzzle", async () =>
+ *     ({ default: (await import("./testing/fakePuzzle")).fakePuzzleOf("powerBox") }));
+ *
+ * Every fake goes into `created`, in the order it was built.
  */
 import type { StepAnswer } from "../../questions/Question";
 
 export const created: FakePuzzle[] = [];
 
 export class FakePuzzle {
+  /** Which puzzle this stands in for (a RoomPuzzle type). */
+  type = "multistep";
   destroyed = false;
   onAnswer?: (answer: StepAnswer) => void;
   onPuzzleFinished?: (solved: boolean) => void;
 
-  constructor(readonly equation: string, readonly options: Record<string, unknown>) {
+  /**
+   * @param source What the puzzle was built from: the equation for a multistep
+   *   puzzle, the pairs for a Power Box, the Questions for a Laser Match.
+   */
+  constructor(readonly source: unknown, readonly options: Record<string, unknown>) {
     created.push(this);
   }
 
@@ -23,6 +35,13 @@ export class FakePuzzle {
   answer(answer: StepAnswer): void {
     this.onAnswer?.(answer);
   }
+}
+
+/** A FakePuzzle class whose instances report `type`. */
+export function fakePuzzleOf(type: string): typeof FakePuzzle {
+  return class extends FakePuzzle {
+    override type = type;
+  };
 }
 
 export default FakePuzzle;

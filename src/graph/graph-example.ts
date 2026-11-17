@@ -1,6 +1,8 @@
 import Konva from 'konva';
 
 import LaserMatchPuzzle from '../puzzles/laser-match-puzzle';
+import { generateLaserQuestions } from './graph-equation-generator';
+import { Difficulty } from '../score';
 
 const stage = new Konva.Stage({
   container: 'container',
@@ -12,9 +14,7 @@ const layer = new Konva.Layer();
 stage.add(layer);
 
 const puzzle = new LaserMatchPuzzle(
-  'y = 1 * x + 1',
-  'y = -1 * x * x + 0 * x + 2',
-  'y = -2 * x - 1',
+  generateLaserQuestions(Difficulty.Medium),
   {
     layer,
     x: stage.width() / 2,
@@ -26,7 +26,7 @@ const puzzle = new LaserMatchPuzzle(
 );
 
 puzzle.onAnswer = answer => {
-  console.log(`Selected graph ${answer.playerAnswer}; expected ${answer.correctAnswer}. Last step? ${answer.isLastStep}`);
+  console.log(`Selected graph ${answer.playerAnswer}; expected ${answer.correctAnswer}. Solves the Room? ${answer.solvesRoom}`);
 };
 
 puzzle.onPuzzleFinished = solved => {

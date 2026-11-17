@@ -85,6 +85,41 @@ export function equationFromConfig(graphConfig: GraphConfig): string {
   throw new Error("Graph config must describe either a line or a quadratic.");
 }
 
+/** `coefficient` written before `variable` the way people write it: `2x`, `-x`, `x`. */
+function term(coefficient: number, variable: string): string {
+  if (coefficient === 1) return variable;
+  if (coefficient === -1) return `-${variable}`;
+  return `${coefficient}${variable}`;
+}
+
+/**
+ * Writes an equation that `parseEquation` accepts the way it's shown to the
+ * player, dropping `*`, ones and zero terms: `y = 1 * x * x + 0 * x - 2` →
+ * `y = x² - 2`, `y = -1 * x + 1` → `y = -x + 1`.
+ */
+export function formatGraphEquation(equationString: string): string {
+  const config = parseEquation(equationString);
+  const terms: number[] = [];
+  const names: string[] = [];
+  if (config.slope !== undefined && config.yOffset !== undefined) {
+    terms.push(config.slope, config.yOffset);
+    names.push("x", "");
+  } else {
+    terms.push(config.a!, config.b!, config.c!);
+    names.push("x²", "x", "");
+  }
+
+  let text = "";
+  terms.forEach((value, index) => {
+    if (value === 0) return;
+    const name = names[index];
+    const magnitude = name ? term(Math.abs(value), name) : String(Math.abs(value));
+    if (text === "") text = value < 0 ? `-${magnitude}` : magnitude;
+    else text += value < 0 ? ` - ${magnitude}` : ` + ${magnitude}`;
+  });
+  return `y = ${text || "0"}`;
+}
+
 class Graph {
   private static readonly DEFAULT_STEP_SIZE: number = 0.001;
   private static readonly DEFAULT_X_STRETCH: number = 20.0;

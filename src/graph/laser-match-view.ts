@@ -2,6 +2,7 @@ import Konva from 'konva';
 
 import RadioButton from '../radio-button/radio-button';
 import type { GraphEntry } from './graph-match-model';
+import { formatGraphEquation } from './graph';
 
 export interface LaserMatchViewOptions {
   layer: Konva.Layer;
@@ -64,7 +65,7 @@ class LaserMatchView {
     entries.forEach(([equation], index) => {
       const y = rowHeight * index + rowHeight / 2;
       const text = new Konva.Text({
-        text: equation,
+        text: formatGraphEquation(equation),
         x: 24,
         y: y - 16,
         width: this.options.width / 2 - 44,
@@ -150,6 +151,7 @@ class LaserMatchView {
       ? this.pendingMatch.graph
       : this.graphRows.find(row => !row.matched)?.index;
     if (target === undefined) return;
+    this.lockPair(equation, target);
     const laser = this.drawLaser(equation, target);
     if (!laser) return;
     laser.to({
@@ -181,6 +183,17 @@ class LaserMatchView {
         });
       }
     });
+  }
+
+  /** Stops a correct pair from being picked again while its laser blinks. */
+  private lockPair(equation: string, graph: number): void {
+    const equationRow = this.equationRows.find(row => row.equation === equation);
+    const graphRow = this.graphRows.find(row => row.index === graph);
+    if (!equationRow || !graphRow) return;
+    equationRow.matched = true;
+    graphRow.matched = true;
+    equationRow.radio.disable();
+    graphRow.radio.disable();
   }
 
   private finishMatch(equation: string, graph: number): void {
