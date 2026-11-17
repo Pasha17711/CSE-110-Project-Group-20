@@ -113,6 +113,7 @@ class LaserMatchView {
     if (row.matched) return;
     this.selectedGraph?.radio.clear();
     this.selectedGraph = row;
+    row.radio.click();
     this.tryMatch();
   }
 
