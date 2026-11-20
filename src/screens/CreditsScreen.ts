@@ -26,6 +26,10 @@ const HEADING_SIZE = 30;
 const LINE_SIZE = 22;
 const LINE_HEIGHT = 30;
 const SECTION_GAP = 24;
+/** Space between the vault door's edge and the white card. */
+const CARD_MARGIN = 20;
+/** Space between the white card's top/bottom edge and the text. */
+const CARD_PADDING = 20;
 
 /** Lists who made the game; Back returns to the Start Screen. */
 export class CreditsScreen implements CreditsScreenContract {
@@ -55,30 +59,48 @@ export class CreditsScreen implements CreditsScreenContract {
     }));
   }
 
-  /** Lays the sections out in two columns inside the vault door. */
+  /** Lays the sections out in two columns on a white card inside the vault door. */
   private buildColumns(credits: CreditsSection[]): Konva.Group {
     const group = new Konva.Group({ listening: false });
     const columnWidth = (VAULT_DOOR.width - PADDING * 2 - COLUMN_GAP) / 2;
+    const top = VAULT_DOOR.y + PADDING;
+    const texts: Konva.Text[] = [];
+    let bottom = top;
 
     splitInHalf(credits).forEach((column, i) => {
       const x = VAULT_DOOR.x + PADDING + i * (columnWidth + COLUMN_GAP);
-      let y = VAULT_DOOR.y + PADDING;
+      let y = top;
       for (const section of column) {
-        group.add(createText({
+        texts.push(createText({
           x, y, width: columnWidth, text: section.heading,
           fontSize: HEADING_SIZE, fill: COLORS.purple,
         }));
         y += HEADING_SIZE + 10;
         for (const line of section.lines) {
-          group.add(createText({
+          texts.push(createText({
             x, y, width: columnWidth, text: line,
             fontSize: LINE_SIZE, fontStyle: "500", fill: COLORS.purple,
           }));
           y += LINE_HEIGHT;
         }
+        bottom = Math.max(bottom, y);
         y += SECTION_GAP;
       }
     });
+
+    // White card behind the text so it reads clearly over the vault's rings
+    group.add(new Konva.Rect({
+      x: VAULT_DOOR.x + CARD_MARGIN,
+      y: top - CARD_PADDING,
+      width: VAULT_DOOR.width - CARD_MARGIN * 2,
+      height: bottom - top + CARD_PADDING * 2,
+      cornerRadius: 18,
+      fill: COLORS.white,
+      stroke: COLORS.purple,
+      strokeWidth: 3,
+      name: "credits-card",
+    }));
+    texts.forEach((text) => group.add(text));
     return group;
   }
 
