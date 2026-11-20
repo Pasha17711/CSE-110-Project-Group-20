@@ -176,13 +176,11 @@ function formatPrompt(parts: QuestionParts, difficulty: Difficulty): string {
       return `${leftTerm} ${formatSignedTerm(addedNumber)} = ${leftTermValue + addedNumber}`;
     case Difficulty.Hard:
       return `${leftTerm} ${formatSignedTerm(addedNumber)} = ${rightTerm} ${formatSignedTerm(rightNumber)}`;
-    default:
-      throw new RangeError(`unknown difficulty: ${difficulty}`);
   }
 }
 
 /**
- * randomly generates and returns a Question
+ * randomly generates and returns a Question of the specified difficulty
  *
  * Easy: 1 step to solve, e.g. x * 3 = 21, x + 4 = 5
  *
@@ -194,8 +192,58 @@ function formatPrompt(parts: QuestionParts, difficulty: Difficulty): string {
  * 
  * @return a Question of the specified difficulty, in the format as specified above
  */
-export function getQuestion(difficulty: Difficulty): Question {
+function getQuestionOfDifficulty(difficulty: Difficulty): Question {
   const parts: QuestionParts = generateParts();
 
   return { prompt: formatPrompt(parts, difficulty), answer: String(parts.answerValue) };
+}
+
+/**
+ * randomly generates and returns a Question of a random difficulty
+ *
+ * randomly selects a question difficulty based on the input difficulty:
+ *
+ * Easy: 60% chance for an easy question, 30% for medium, 10% for hard
+ *
+ * Medium: 20%, 60%, 20%
+ *
+ * Hard: 5%, 20%, 75%
+ *
+ * @param difficulty: selected difficulty of the game, off of which the probabilities are built
+ *
+ * @return a Question of random difficulty
+ */
+export function getQuestion(difficulty: Difficulty): Question {
+  const roll: number = Math.random();
+
+  let mediumThreshold: number;
+  let hardThreshold: number;
+
+  switch (difficulty) {
+    case Difficulty.Easy:
+      mediumThreshold = 0.6;
+      hardThreshold = 0.9;
+      break;
+    case Difficulty.Medium:
+      mediumThreshold = 0.2;
+      hardThreshold = 0.8;
+      break;
+    case Difficulty.Hard:
+      mediumThreshold = 0.05;
+      hardThreshold = 0.25;
+      break;
+    default:
+      throw new RangeError(`unknown difficulty: ${difficulty}`);
+  }
+
+  let targetDifficulty: Difficulty;
+  if (roll > hardThreshold) {
+    targetDifficulty = Difficulty.Hard;
+  } else if (roll > mediumThreshold) {
+    targetDifficulty = Difficulty.Medium;
+  } else {
+    targetDifficulty = Difficulty.Easy;
+  }
+
+  return getQuestionOfDifficulty(targetDifficulty);
 }
