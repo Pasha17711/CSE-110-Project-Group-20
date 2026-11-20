@@ -14,12 +14,9 @@ export interface CreditsSection {
  * fills the left column first, then the right.
  */
 export const CREDITS: CreditsSection[] = [
-  { heading: "Team", lines: ["Team Member 1", "Team Member 2", "Team Member 3", "Team Member 4"] },
-  { heading: "Game Design", lines: ["Team Member 1", "Team Member 2"] },
-  { heading: "Art & UI", lines: ["Team Member 3"] },
+  { heading: "Team", lines: ["Seven Flaminiano", "Calista Hartono", "Asad Pasha Chaudhry", "Ping-Shu Lee", "Brian To", "Kaiyo Igaki"] },
   { heading: "Built With", lines: ["Konva", "Vite + TypeScript"] },
   { heading: "Fonts", lines: ["Gasoek One", "Fredoka"] },
-  { heading: "Special Thanks", lines: ["CSE 110 course staff"] },
 ];
 
 const PANEL = { x: 206, y: 160, width: 987, height: 600 };
