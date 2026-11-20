@@ -89,6 +89,17 @@ vi.mock('../text-input/text-input', () => ({
   },
 }))
 
+vi.mock('../text-input/keypad-input', () => ({
+  default: class {
+    show() {}
+    hide() {}
+    setAnswer() {}
+    position() {}
+    moveToTop() {}
+    destroy() {}
+  },
+}))
+
 import BasicMultistepPuzzle from './basic-multistep-puzzle'
 
 const makeLayer = () => {

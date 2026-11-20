@@ -32,6 +32,7 @@ class MultistepSolverController {
     playerAnswer: string,
     correctAnswer: string,
     isLastStep: boolean,
+    stepPrompt?: string,
   ) => void
 
   /** Creates a controller for a model and view. @param model Equation model. @param view Solver view. */
@@ -131,10 +132,11 @@ class MultistepSolverController {
       return
     }
 
-    const [_, correctAnswer] = problems[0]
+    const [stepPrompt, correctAnswer] = problems[0]
     const isLastStep = this.isLastArithmeticStep()
     this.arithmeticAnswerAccepted = answer === correctAnswer
-    this.onAnswerSubmit?.(this.equation, answer, correctAnswer, isLastStep)
+    this.onAnswerSubmit?.(this.equation, answer, correctAnswer, isLastStep,
+      stepPrompt)
   }
 
   /** Applies the currently accepted operation or arithmetic answer. */

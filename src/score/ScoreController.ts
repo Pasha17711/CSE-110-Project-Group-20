@@ -72,9 +72,9 @@ export class ScoreController {
   }
 
   /** The room's question was answered correctly. Returns the money earned. */
-  roomSolved(kind: RoomKind = "main"): number {
+  roomSolved(kind: RoomKind = "main", roomId?: string): number {
     this.syncElapsed();
-    const earned = this.model.recordRoomSolved(kind);
+    const earned = this.model.recordRoomSolved(kind, roomId);
     this.emitChange();
     return earned;
   }
@@ -105,7 +105,12 @@ export class ScoreController {
       notifications.subscribe(EventType.ReturnedToMap, () => this.returnToMap()),
       notifications.subscribe(EventType.Incorrect, () => this.answerIncorrect()),
       notifications.subscribe(EventType.RoomSolved, (event) => {
-        if (event.eventType === EventType.RoomSolved) this.roomSolved(event.roomKind);
+        if (event.eventType === EventType.RoomSolved) this.roomSolved(event.roomKind, event.roomId);
+      }),
+      notifications.subscribe(EventType.HintUsed, (event) => {
+        if (event.eventType !== EventType.HintUsed) return;
+        this.model.recordHintUsed(event.roomId);
+        this.emitChange();
       }),
     ];
     this.eventUnsubscribers.push(...unsubscribers);

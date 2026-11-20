@@ -1,17 +1,18 @@
 import { NotificationManager } from "../notification-manager/NotificationManager";
 import { EventType } from "../notification-manager/GameEvent";
-import { getQuestion } from "../questions/QuestionGenerator";
-import type { StepAnswer } from "../questions/Question";
+import { solvesRoom, type Question, type StepAnswer } from "../questions/Question";
 import { ScoreController, ScoreModel } from "../score";
+import { MAX_HINTS_PER_ROOM } from "../score/ScoreModel";
 import type { Difficulty, ScoreSnapshot } from "../score";
 import { MapController } from "../map/MapController";
 import type { SwitchMapScreen } from "../map/MapController";
-import { Room, type RoomKind } from "../map/Room";
+import { Room } from "../map/Room";
 import { AnswerHistory } from "../validation/AnswerHistory";
 import type { AnswerRecord } from "../validation/AnswerHistory";
 import { AnswerValidator } from "../validation/AnswerValidator";
 import type { ScreenController } from "../screens/ScreenController";
 import type { MapScreen, RoomScreen, Unsubscribe } from "../screens/contracts";
+import { MapLayout } from "../map/MapLayout";
 
 export type HeistOutcome = "escaped" | "caught";
 
@@ -28,23 +29,7 @@ export interface GameDeps {
   roomScreen: RoomScreen;
 }
 
-interface RoomLayout {
-  id: string;
-  name: string;
-  kind: RoomKind;
-  prerequisites: string[];
-}
-
 export const VAULT_ID = "vault";
-
-/** The bank's Rooms, from the map layout in #30. */
-export const ROOM_LAYOUT: readonly RoomLayout[] = [
-  { id: "room_a", name: "Room A", kind: "main", prerequisites: [] },
-  { id: "room_b", name: "Room B", kind: "main", prerequisites: [] },
-  { id: "room_c", name: "Room C", kind: "main", prerequisites: ["room_a", "room_b"] },
-  { id: "room_X", name: "Room X", kind: "bonus", prerequisites: [] },
-  { id: VAULT_ID, name: "Vault", kind: "main", prerequisites: ["room_c"] },
-];
 
 /**
  * One Heist. Builds the heist-scoped modules and wires them to the
@@ -63,6 +48,7 @@ export class Game {
   private readonly rooms: Room[];
   private readonly map: MapController;
   private readonly history = new AnswerHistory();
+  private readonly hintsByRoom = new Map<string, number>();
   private readonly validator: AnswerValidator;
 
   /** Unsubscribers for everything Game registered on longer-lived objects. */
@@ -74,6 +60,13 @@ export class Game {
   private answering = false;
   private pendingOutcome: HeistOutcome | null = null;
 
+  /**
+   * The Step each Question in the current Room is on, from 1. A Power Box or
+   * Laser Room has one Question per pair, so each keeps its own count.
+   * Cleared on entering a Room, since the puzzle restarts from Step 1.
+   */
+  private readonly stepNumbers = new Map<Question, number>();
+
   constructor(difficulty: Difficulty, deps: GameDeps) {
     this.notifications = deps.notifications;
     this.screens = deps.screens;
@@ -84,10 +77,10 @@ export class Game {
     this.score = new ScoreController(new ScoreModel({ difficulty }));
     // The score changes only through events; score.dispose() unsubscribes.
     this.score.listenTo(this.notifications);
-    this.map = new MapController(this.notifications);
-    this.rooms = ROOM_LAYOUT.map(
-      (r) => new Room({ ...r, question: getQuestion(difficulty) }),
-    );
+    // Generates map layout based on difficulty
+    const layout = MapLayout.createLayout(difficulty);
+    this.rooms = layout.rooms;
+    this.map = new MapController(this.notifications, layout.grid);
     this.rooms.forEach((room) => this.map.registerRoom(room));
     this.validator = new AnswerValidator(this.history, this.notifications);
 
@@ -95,7 +88,7 @@ export class Game {
   }
 
   start(): void {
-    this.mapScreen.setRooms(this.rooms, this.map.solvedRooms);
+    this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
     this.updateHud();
     this.screens.show("map");
     this.notifications.send({ eventType: EventType.GameStart });
@@ -126,6 +119,7 @@ export class Game {
         if (!this.ended) this.map.returnToMap(); // map sends ReturnedToMap → clock pauses
       }),
       this.roomScreen.onAnswer((answer) => this.handleAnswer(answer)),
+      ...(this.roomScreen.onHint ? [this.roomScreen.onHint(() => this.handleHint())] : []),
     );
 
     // Map → screens.
@@ -158,13 +152,24 @@ export class Game {
   private handleScreenChange(event: SwitchMapScreen): void {
     if (this.ended) return;
     if (event.room) {
-      this.roomScreen.setQuestion(event.room.question, event.room.name);
+      this.stepNumbers.clear();
+      this.roomScreen.setRoom(event.room, this.hintsByRoom.get(event.room.id) ?? 0);
       this.updateHud();
       this.screens.show("room");
     } else if (event.screen === "map") {
-      this.mapScreen.setRooms(this.rooms, this.map.solvedRooms);
+      // Update grid to show completed rooms
+      this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
       this.screens.show("map");
     }
+  }
+
+  private handleHint(): void {
+    const room = this.map.activeRoom;
+    if (this.ended || !room) return;
+    const used = this.hintsByRoom.get(room.id) ?? 0;
+    if (used >= MAX_HINTS_PER_ROOM) return;
+    this.hintsByRoom.set(room.id, used + 1);
+    this.notifications.send({ eventType: EventType.HintUsed, roomId: room.id });
   }
 
   private handleAnswer(answer: StepAnswer): void {
@@ -174,10 +179,13 @@ export class Game {
     // The validator sends RoomSolved/Correct/Incorrect (the score listens to
     // them) and records the Answer. A wrong Answer can run the clock out in the middle of this call,
     // so onTimeUp only flags the ending until the Answer has been recorded.
+    const question = answer.question ?? room.question;
+    const stepNumber = this.stepNumbers.get(question) ?? 1;
     this.answering = true;
     let correct: boolean;
     try {
-      correct = this.validator.validateAnswer(room.question, answer, room.kind);
+      correct = this.validator.validateAnswer(question, answer, room.kind, room.id, stepNumber);
+      if (correct) this.stepNumbers.set(question, stepNumber + 1);
     } finally {
       this.answering = false;
     }
@@ -188,7 +196,7 @@ export class Game {
       this.end("caught");
       return;
     }
-    if (!correct || !answer.isLastStep) return; // stay in the Room
+    if (!correct || !solvesRoom(answer)) return; // stay in the Room
 
     if (room.id === VAULT_ID) {
       this.map.solveVault(VAULT_ID);

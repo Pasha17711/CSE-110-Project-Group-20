@@ -60,6 +60,10 @@ export const ROOM_MONEY: Record<RoomKind, number> = {
 /** Score multiplier for finishing without a single wrong answer. */
 export const FLAWLESS_BONUS = 1.2;
 
+/** Each hint reduces that room\'s payout by 25%, up to 50% for two hints. */
+export const HINT_REWARD_PENALTY_RATE = 0.25;
+export const MAX_HINTS_PER_ROOM = 2;
+
 export interface ScoreOptions {
   difficulty?: Difficulty;
   /** Starting time on the clock. Defaults to 1 hour. */
@@ -85,6 +89,7 @@ export class ScoreModel {
   private readonly difficulty: Difficulty;
   private readonly timeLimitMs: number;
   private money = 0;
+  private readonly hintsUsedByRoom = new Map<string, number>();
   private mainRoomsSolved = 0;
   private bonusRoomsSolved = 0;
   private incorrectAnswers = 0;
@@ -167,14 +172,23 @@ export class ScoreModel {
    * Player solved a room's question. Returns the money earned.
    * Once time is up the solve is rejected: nothing is counted and 0 is returned.
    */
-  recordRoomSolved(kind: RoomKind): number {
+  recordRoomSolved(kind: RoomKind, roomId?: string): number {
     if (!(kind in ROOM_MONEY)) throw new RangeError(`unknown room kind: ${kind}`);
     if (this.isTimeUp()) return 0;
     if (kind === "bonus") this.bonusRoomsSolved += 1;
     else this.mainRoomsSolved += 1;
-    const earned = ROOM_MONEY[kind] * this.getMultiplier();
+    const fullReward = ROOM_MONEY[kind] * this.getMultiplier();
+    const hintsUsed = roomId ? (this.hintsUsedByRoom.get(roomId) ?? 0) : 0;
+    const earned = Math.round(fullReward * (1 - HINT_REWARD_PENALTY_RATE * hintsUsed));
     this.money += earned;
     return earned;
+  }
+
+  /** Records a hint for this room without affecting mistakes or the clock. */
+  recordHintUsed(roomId: string): void {
+    if (!roomId) throw new RangeError("A hint must have a room ID");
+    const prior = this.hintsUsedByRoom.get(roomId) ?? 0;
+    this.hintsUsedByRoom.set(roomId, Math.min(MAX_HINTS_PER_ROOM, prior + 1));
   }
 
   /** Player answered wrong: counts the mistake and removes penaltyMs from the clock. */
