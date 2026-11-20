@@ -6,7 +6,7 @@ const MAX_FACTOR: number = 10; // factors can range from 2 to MAX_FACTOR
 
 // probabilities of easy, medium, hard questions being generated, respectively,
 // at different game difficulties
-const DIFFICULTY_WEIGHTS: Record<Difficulty, readonly [number, number, number]> = {
+export const DIFFICULTY_WEIGHTS: Record<Difficulty, readonly [number, number, number]> = {
   [Difficulty.Easy]: [0.6, 0.3, 0.1],
   [Difficulty.Medium]: [0.2, 0.6, 0.2],
   [Difficulty.Hard]: [0.05, 0.2, 0.75]
@@ -200,14 +200,14 @@ function formatPrompt(parts: QuestionParts, difficulty: Difficulty): string {
  * 
  * @return a Question of the specified difficulty, in the format as specified above
  */
-function getQuestionOfDifficulty(difficulty: Difficulty): Question {
+export function getQuestionOfDifficulty(difficulty: Difficulty): Question {
   const parts: QuestionParts = generateParts();
 
   return { prompt: formatPrompt(parts, difficulty), answer: String(parts.answerValue) };
 }
 
 // randomly picks a difficulty based on the given weights [easy, medium, hard]
-function pickDifficulty(weights: readonly [number, number, number]): Difficulty {
+export function pickDifficulty(weights: readonly [number, number, number]): Difficulty {
   const mediumThreshold = weights[0];
   const hardThreshold = mediumThreshold + weights[1]; 
   const roll: number = Math.random();
