@@ -1,8 +1,8 @@
-import { createClient, SupabaseClient, type SupaBaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null | undefined;
 
-export function getSupabase(): SupaBaseClient | null {
+export function getSupabase(): SupabaseClient | null {
   if (client !== undefined) return client;
 
   const url = import.meta.env.VITE_SUPABASE_URL;
