@@ -13,7 +13,9 @@ export {
 export type { ScoreOptions, ScoreSnapshot } from "./ScoreModel";
 export { ScoreController, WRONG_ANSWER_PENALTY_SECONDS } from "./ScoreController";
 export type { ScoreListener } from "./ScoreController";
-export { Leaderboard, LEADERBOARD_KEY } from "./Leaderboard";
-export type { AddEntryResult, LeaderboardEntry, StorageLike } from "./Leaderboard";
+export { Leaderboard, LEADERBOARD_SIZE, PLAYER_NAME_MAX_LENGTH } from "./Leaderboard";
+export type { AddEntryResult, LeaderboardEntry, LoadResult, PersonalBestResult } from "./Leaderboard";
+export { MemoryLeaderboardStore, UnavailableLeaderboardStore } from "./LeaderboardStore";
+export type { LeaderboardStore, NewEntry, SeedEntry, StoreOperation, StoredEntry } from "./LeaderboardStore";
 export { formatTime, formatMoney } from "./format";
 export { secondsToMs, minutesToMs, hoursToMs, msToWholeSeconds } from "./time";

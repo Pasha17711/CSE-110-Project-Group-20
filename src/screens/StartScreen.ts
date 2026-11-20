@@ -450,13 +450,28 @@ export class StartScreen implements StartScreenContract {
     }
   }
 
+  /**
+   * Loads one Difficulty's Leaderboard, then draws it. A load that finishes
+   * after the player picked another tab is ignored. A failed load shows the
+   * empty-board text for now (loading and error states come in stage 4).
+   */
   private renderLeaderboardRows(difficulty: Difficulty): void {
+    this.boardRowsGroup.destroyChildren();
+    if (!this.leaderboard) return;
+
+    void this.leaderboard.getEntries(difficulty).then((result) => {
+      if (this.selectedBoardDifficulty !== difficulty) return;
+      this.drawLeaderboardRows(difficulty, result.status === "loaded" ? result.entries : []);
+      this.layer.batchDraw();
+    });
+  }
+
+  private drawLeaderboardRows(difficulty: Difficulty, entries: LeaderboardEntry[]): void {
     this.boardRowsGroup.destroyChildren();
 
     const modalW = 720;
     const mx = (DESIGN_WIDTH - modalW) / 2;
     const startY = 300;
-    const entries: LeaderboardEntry[] = this.leaderboard?.getEntries(difficulty) ?? [];
 
     if (entries.length === 0) {
       this.boardRowsGroup.add(createText({

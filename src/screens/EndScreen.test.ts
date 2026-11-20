@@ -5,7 +5,7 @@ vi.mock("../text-input/text-input", () => import("./testing/fakeTextInput"));
 
 import type Konva from "konva";
 import { EndScreen } from "./EndScreen";
-import { Difficulty, type LeaderboardEntry, type ScoreSnapshot } from "../score";
+import { Difficulty, type AddEntryResult, type LeaderboardEntry, type ScoreSnapshot } from "../score";
 import type { HeistResult } from "../game/Game";
 import { visibleTexts } from "./testing/fakeKonva";
 import { created, type FakeTextInput } from "./testing/fakeTextInput";
@@ -43,8 +43,12 @@ function caught(overrides: Partial<ScoreSnapshot> = {}): HeistResult {
   };
 }
 
-function entry(playerName: string, score: number): LeaderboardEntry {
-  return { playerName, difficulty: Difficulty.Medium, score, timeSpentMs: 65_000, date: "2026-11-02T00:00:00.000Z" };
+function entry(playerName: string, score: number, isMine = false): LeaderboardEntry {
+  return { id: playerName, playerName, difficulty: Difficulty.Medium, score, timeSpentMs: 65_000, date: "2026-11-02T00:00:00.000Z", isMine };
+}
+
+function saved(rank: number, isNewBest = true): AddEntryResult {
+  return { status: "saved", rank, isNewBest, best: entry("Me", 900, true) };
 }
 
 describe("EndScreen", () => {
@@ -202,32 +206,50 @@ describe("EndScreen", () => {
       return { shown: node.visible(), text: node.text() };
     }
 
-    it("shows the rank when the score made the board", () => {
+    it("shows the Rank of a new Personal Best", () => {
       screen.setResult(escaped(), []);
-      screen.showSaveResult({ status: "ranked", rank: 2 });
+      screen.showSaveResult(saved(2));
 
-      expect(message()).toEqual({ shown: true, text: "Saved! You're #2 on the Medium leaderboard." });
+      expect(message()).toEqual({ shown: true, text: "New Personal Best! You're #2 on the Medium leaderboard." });
     });
 
-    it("says so when the score didn't make the board", () => {
+    it("says the Personal Best still stands when the run was worse", () => {
       screen.setResult(escaped(), []);
-      screen.showSaveResult({ status: "notRanked" });
+      screen.showSaveResult(saved(3, false));
 
-      expect(message()).toEqual({ shown: true, text: "Not on the Medium leaderboard this time. Try again!" });
+      expect(message()).toEqual({ shown: true, text: "Saved. Your Personal Best is still #3 on Medium." });
+    });
+
+    it("adds a nudge when the Rank is outside the top 10", () => {
+      screen.setResult(escaped(), []);
+      screen.showSaveResult(saved(10));
+      expect(message().text).toBe("New Personal Best! You're #10 on the Medium leaderboard.");
+
+      screen.showSaveResult(saved(11));
+      expect(message().text).toBe("New Personal Best! You're #11 on the Medium leaderboard. Top 10 next time!");
+
+      screen.showSaveResult(saved(42, false));
+      expect(message().text).toBe("Saved. Your Personal Best is still #42 on Medium. Top 10 next time!");
+    });
+
+    it("says so when the score saved but the Rank couldn't load", () => {
+      screen.setResult(escaped(), []);
+      screen.showSaveResult({ status: "savedUnranked" });
+
+      expect(message()).toEqual({ shown: true, text: "Saved! Couldn't load the leaderboard to show your rank." });
     });
 
     it("says so when saving failed", () => {
       screen.setResult(escaped(), []);
       screen.showSaveResult({ status: "saveFailed" });
 
-      expect(message().shown).toBe(true);
-      expect(message().text).toContain("Couldn't save your score");
+      expect(message()).toEqual({ shown: true, text: "Couldn't save your score. Check your connection and try again." });
     });
 
     it("keeps the message when the same result is shown again (the leaderboard refresh)", () => {
       const result = escaped();
       screen.setResult(result, []);
-      screen.showSaveResult({ status: "ranked", rank: 1 });
+      screen.showSaveResult(saved(1));
 
       screen.setResult(result, [entry("Ana", result.snapshot.score)]);
 
@@ -236,7 +258,7 @@ describe("EndScreen", () => {
 
     it("clears the message for a new result", () => {
       screen.setResult(escaped(), []);
-      screen.showSaveResult({ status: "ranked", rank: 1 });
+      screen.showSaveResult(saved(1));
 
       screen.setResult(escaped(), []);
 

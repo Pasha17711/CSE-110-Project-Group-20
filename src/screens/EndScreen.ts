@@ -1,7 +1,6 @@
 import Konva from "konva";
 import TextInput from "../text-input/text-input";
-import { DIFFICULTY_LABEL, formatMoney, formatTime } from "../score";
-import type { AddEntryResult, LeaderboardEntry } from "../score";
+import { DIFFICULTY_LABEL, LEADERBOARD_SIZE, formatMoney, formatTime, type AddEntryResult, type LeaderboardEntry } from "../score";
 import type { HeistResult } from "../game/Game";
 import type { EndScreen as EndScreenContract, Unsubscribe } from "./contracts";
 import { DESIGN_WIDTH, DESIGN_HEIGHT, fitLayer } from "./layout";
@@ -583,16 +582,21 @@ this.reviewStatusBubble = new Konva.Rect({
   showSaveResult(result: AddEntryResult): void {
     const difficulty = this.result ? DIFFICULTY_LABEL[this.result.snapshot.difficulty] : "";
     switch (result.status) {
-      case "ranked":
-        this.saveMessage.text(`Saved! You're #${result.rank} on the ${difficulty} leaderboard.`);
-        this.saveMessage.fill(COLORS.green);
+      case "saved": {
+        const message = result.isNewBest
+          ? `New Personal Best! You're #${result.rank} on the ${difficulty} leaderboard.`
+          : `Saved. Your Personal Best is still #${result.rank} on ${difficulty}.`;
+        const nudge = result.rank > LEADERBOARD_SIZE ? ` Top ${LEADERBOARD_SIZE} next time!` : "";
+        this.saveMessage.text(message + nudge);
+        this.saveMessage.fill(result.isNewBest ? COLORS.green : COLORS.gold);
         break;
-      case "notRanked":
-        this.saveMessage.text(`Not on the ${difficulty} leaderboard this time. Try again!`);
+      }
+      case "savedUnranked":
+        this.saveMessage.text("Saved! Couldn't load the leaderboard to show your rank.");
         this.saveMessage.fill(COLORS.gold);
         break;
       case "saveFailed":
-        this.saveMessage.text("Couldn't save your score: browser storage is full or blocked.");
+        this.saveMessage.text("Couldn't save your score. Check your connection and try again.");
         this.saveMessage.fill(COLORS.red);
         break;
     }

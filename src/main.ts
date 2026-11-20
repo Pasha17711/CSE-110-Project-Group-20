@@ -2,7 +2,7 @@ import Konva from "konva";
 import { NotificationManager } from "./notification-manager/NotificationManager";
 import { AudioManager } from "./audio/AudioManager";
 import { EventType } from "./notification-manager/GameEvent";
-import { Leaderboard, type Difficulty } from "./score";
+import { Leaderboard, MemoryLeaderboardStore, type Difficulty } from "./score";
 import { ScreenController } from "./screens/ScreenController";
 import { StartScreen } from "./screens/StartScreen";
 import { MapScreen } from "./screens/MapScreen";
@@ -30,7 +30,8 @@ const stage = new Konva.Stage({
 const notifications = new NotificationManager();
 // One app-scoped subscriber; all sounds react to the same events as the score/HUD.
 const audio = new AudioManager(notifications);
-const leaderboard = new Leaderboard();
+// In memory for now; the online store is wired up once it exists.
+const leaderboard = new Leaderboard(new MemoryLeaderboardStore({ playerId: "local" }));
 const screens = new ScreenController(stage);
 
 const startScreen = new StartScreen(stage.width(), stage.height(), leaderboard);
@@ -70,17 +71,28 @@ notifications.subscribe(EventType.GameOver, () => {
   game = null;
   lastResult = result;
   scoreSaved = false;
-  endScreen.setResult(result, leaderboard.getEntries(result.snapshot.difficulty));
+  endScreen.setResult(result, []);
   screens.show("end");
+  void refreshEndLeaderboard(result);
 });
 
-endScreen.onSaveScore((playerName) => {
+/** Loads the End Screen's Leaderboard, unless another Heist ended in the meantime. */
+async function refreshEndLeaderboard(result: HeistResult): Promise<void> {
+  const loaded = await leaderboard.getEntries(result.snapshot.difficulty);
+  if (lastResult !== result) return;
+  endScreen.setResult(result, loaded.status === "loaded" ? loaded.entries : []);
+}
+
+endScreen.onSaveScore(async (playerName) => {
   if (!lastResult || lastResult.outcome !== "escaped" || scoreSaved) return;
+  // Set before the first await so a second submit can't save twice.
   scoreSaved = true;
-  const { difficulty, score, timeSpentMs } = lastResult.snapshot;
-  const saveResult = leaderboard.addEntry({ playerName, difficulty, score, timeSpentMs });
-  endScreen.setResult(lastResult, leaderboard.getEntries(difficulty));
+  const result = lastResult;
+  const { difficulty, score, timeSpentMs } = result.snapshot;
+  const saveResult = await leaderboard.addEntry({ playerName, difficulty, score, timeSpentMs });
+  if (lastResult !== result) return;
   endScreen.showSaveResult(saveResult);
+  await refreshEndLeaderboard(result);
 });
 
 endScreen.onPlayAgain(() => {
