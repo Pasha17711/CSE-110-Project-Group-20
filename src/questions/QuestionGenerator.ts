@@ -4,6 +4,14 @@ import { Difficulty } from "../score";
 const ANSWER_RANGE: number = 20; // answers can range from -RANGE to +RANGE
 const MAX_FACTOR: number = 10; // factors can range from 2 to MAX_FACTOR
 
+// probabilities of easy, medium, hard questions being generated, respectively,
+// at different game difficulties
+const DIFFICULTY_WEIGHTS: Record<Difficulty, readonly [number, number, number]> = {
+  [Difficulty.Easy]: [0.6, 0.3, 0.1],
+  [Difficulty.Medium]: [0.2, 0.6, 0.2],
+  [Difficulty.Hard]: [0.05, 0.2, 0.75]
+};
+
 /**
  * helper functions for getting random numbers for question generation
  */
@@ -198,52 +206,33 @@ function getQuestionOfDifficulty(difficulty: Difficulty): Question {
   return { prompt: formatPrompt(parts, difficulty), answer: String(parts.answerValue) };
 }
 
+// randomly picks a difficulty based on the given weights [easy, medium, hard]
+function pickDifficulty(weights: readonly [number, number, number]): Difficulty {
+  const mediumThreshold = weights[0];
+  const hardThreshold = mediumThreshold + weights[1]; 
+  const roll: number = Math.random();
+
+  if (roll > hardThreshold) {
+    return Difficulty.Hard;
+  } else if (roll > mediumThreshold) {
+    return Difficulty.Medium;
+  } else {
+    return Difficulty.Easy;
+  }
+}
+
 /**
  * randomly generates and returns a Question of a random difficulty
  *
- * randomly selects a question difficulty based on the input difficulty:
- *
- * Easy: 60% chance for an easy question, 30% for medium, 10% for hard
- *
- * Medium: 20%, 60%, 20%
- *
- * Hard: 5%, 20%, 75%
+ * randomly selects a question difficulty based on the input difficulty (see DIFFICULTY_WEIGHTS)
  *
  * @param difficulty: selected difficulty of the game, off of which the probabilities are built
  *
  * @return a Question of random difficulty
  */
 export function getQuestion(difficulty: Difficulty): Question {
-  const roll: number = Math.random();
+  const weights = DIFFICULTY_WEIGHTS[difficulty];
+  if (!weights) throw new RangeError(`unknown difficulty: ${difficulty}`);
 
-  let mediumThreshold: number;
-  let hardThreshold: number;
-
-  switch (difficulty) {
-    case Difficulty.Easy:
-      mediumThreshold = 0.6;
-      hardThreshold = 0.9;
-      break;
-    case Difficulty.Medium:
-      mediumThreshold = 0.2;
-      hardThreshold = 0.8;
-      break;
-    case Difficulty.Hard:
-      mediumThreshold = 0.05;
-      hardThreshold = 0.25;
-      break;
-    default:
-      throw new RangeError(`unknown difficulty: ${difficulty}`);
-  }
-
-  let targetDifficulty: Difficulty;
-  if (roll > hardThreshold) {
-    targetDifficulty = Difficulty.Hard;
-  } else if (roll > mediumThreshold) {
-    targetDifficulty = Difficulty.Medium;
-  } else {
-    targetDifficulty = Difficulty.Easy;
-  }
-
-  return getQuestionOfDifficulty(targetDifficulty);
+  return getQuestionOfDifficulty(pickDifficulty(weights));
 }
