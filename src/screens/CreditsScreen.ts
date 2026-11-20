@@ -3,6 +3,7 @@ import type { CreditsScreen as CreditsScreenContract, Unsubscribe } from "./cont
 import { DESIGN_WIDTH, fitLayer } from "./layout";
 import { Listeners } from "./listeners";
 import { COLORS, createBackground, createButton, createText } from "./theme";
+import { VAULT_DOOR, createVaultDoor } from "./vault";
 
 export interface CreditsSection {
   heading: string;
@@ -10,8 +11,8 @@ export interface CreditsSection {
 }
 
 /**
- * Template credits. Replace the placeholders with real names; each section
- * fills the left column first, then the right.
+ * The credits shown on the screen. Sections fill the left column until it
+ * holds about half the lines, then the right.
  */
 export const CREDITS: CreditsSection[] = [
   { heading: "Team", lines: ["Seven Flaminiano", "Calista Hartono", "Asad Pasha Chaudhry", "Ping-Shu Lee", "Brian To", "Kaiyo Igaki"] },
@@ -19,7 +20,7 @@ export const CREDITS: CreditsSection[] = [
   { heading: "Fonts", lines: ["Gasoek One", "Fredoka"] },
 ];
 
-const PANEL = { x: 206, y: 160, width: 987, height: 600 };
+const PADDING = 40;
 const COLUMN_GAP = 40;
 const HEADING_SIZE = 30;
 const LINE_SIZE = 22;
@@ -35,38 +36,33 @@ export class CreditsScreen implements CreditsScreenContract {
     fitLayer(this.layer, stageWidth, stageHeight);
     this.layer.add(createBackground());
 
+    this.layer.add(createVaultDoor());
+
     this.layer.add(createText({
-      x: 0, y: 50, width: DESIGN_WIDTH, text: "CREDITS",
+      x: 0, y: 115, width: DESIGN_WIDTH, text: "CREDITS",
       fontFamily: "Gasoek One", fontStyle: "normal", fontSize: 80,
       align: "center", fill: COLORS.gold, listening: false,
-    }));
-
-    this.layer.add(new Konva.Rect({
-      ...PANEL, fill: COLORS.room, cornerRadius: 18,
-      stroke: COLORS.purple, strokeWidth: 4, listening: false,
     }));
 
     this.layer.add(this.buildColumns(credits));
 
     this.layer.add(createButton({
-      x: PANEL.x + PANEL.width - 163 - 40,
-      y: PANEL.y + PANEL.height - 65 - 30,
+      x: VAULT_DOOR.x + (VAULT_DOOR.width - 163) / 2,
+      y: VAULT_DOOR.y + VAULT_DOOR.height - 65 - 30,
       width: 163, height: 65, fontSize: 28,
       label: "Back", name: "credits-back",
       onClick: () => this.backs.emit(),
     }));
   }
 
-  /** Splits the sections into two columns, half in each. */
+  /** Lays the sections out in two columns inside the vault door. */
   private buildColumns(credits: CreditsSection[]): Konva.Group {
     const group = new Konva.Group({ listening: false });
-    const padding = 50;
-    const columnWidth = (PANEL.width - padding * 2 - COLUMN_GAP) / 2;
-    const split = Math.ceil(credits.length / 2);
+    const columnWidth = (VAULT_DOOR.width - PADDING * 2 - COLUMN_GAP) / 2;
 
-    [credits.slice(0, split), credits.slice(split)].forEach((column, i) => {
-      const x = PANEL.x + padding + i * (columnWidth + COLUMN_GAP);
-      let y = PANEL.y + 40;
+    splitInHalf(credits).forEach((column, i) => {
+      const x = VAULT_DOOR.x + PADDING + i * (columnWidth + COLUMN_GAP);
+      let y = VAULT_DOOR.y + PADDING;
       for (const section of column) {
         group.add(createText({
           x, y, width: columnWidth, text: section.heading,
@@ -98,4 +94,17 @@ export class CreditsScreen implements CreditsScreenContract {
   hide(): void {
     this.layer.hide();
   }
+}
+
+/** Splits sections into two columns with roughly equal line counts (heading included). */
+function splitInHalf(credits: CreditsSection[]): [CreditsSection[], CreditsSection[]] {
+  const size = (section: CreditsSection) => section.lines.length + 1;
+  const half = credits.reduce((sum, section) => sum + size(section), 0) / 2;
+  let left = 0;
+  let split = 0;
+  while (split < credits.length && left < half) {
+    left += size(credits[split]);
+    split++;
+  }
+  return [credits.slice(0, split), credits.slice(split)];
 }
