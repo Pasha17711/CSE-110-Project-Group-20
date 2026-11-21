@@ -31,6 +31,7 @@ export interface BasicMultistepPuzzleOptions {
 /** Self-contained composition of the multistep solver and its input controls. */
 class BasicMultistepPuzzle implements Puzzle {
   private static readonly DROP_ZONE_SIZE = 100
+  private static readonly LABEL_GAP = 12
 
   private readonly options: BasicMultistepPuzzleOptions
   private readonly view: MultistepSolverView
@@ -39,6 +40,8 @@ class BasicMultistepPuzzle implements Puzzle {
   private readonly textInput: TextInput
   private readonly keypad: KeypadInput
   private keypadAnswer = ''
+  /** The expression an Arithmetic Step asks for, shown left of the input. */
+  private readonly arithmeticLabel: Konva.Text
 
   /** Called when the puzzle reaches its Finished state. */
   public onPuzzleFinished?: (solved: boolean) => void
@@ -78,14 +81,22 @@ class BasicMultistepPuzzle implements Puzzle {
       height: options.inputHeight ?? 50,
       backgroundColor: '#eeeeee',
       foregroundColor: '#000000',
-      ghostText: 'input',
+      ghostText: '?',
       ghostTextColor: '#aaaaaa',
+    })
+
+    this.arithmeticLabel = new Konva.Text({
+      fill: '#ffffff',
+      fontSize: Math.floor((options.blockSize ?? 32) / 2),
+      visible: false,
+      listening: false,
     })
 
     this.keypad = new KeypadInput();
     options.layer.add(this.keypad);
 
     options.layer.add(this.actionMenu)
+    options.layer.add(this.arithmeticLabel)
     this.view.setPosition(options.x, options.y)
     this.hideExternalControls()
     this.connectComponents()
@@ -186,10 +197,15 @@ class BasicMultistepPuzzle implements Puzzle {
         this.onAnswer?.({ playerAnswer, correctAnswer, isLastStep, stepPrompt })
     }
 
+    this.controller.onArithmeticStep = expression => {
+      this.showArithmeticLabel(expression)
+    }
+
     this.controller.onStateChange = state => {
       if (state === 'Operation') {
         this.textInput.hide()
         this.keypad.hide()
+        this.arithmeticLabel.visible(false)
         this.actionMenu.show(this.actionMenuX(), this.options.y)
         return
       }
@@ -235,7 +251,9 @@ class BasicMultistepPuzzle implements Puzzle {
     this.onPuzzleFinished = undefined
     this.controller.onAnswerSubmit = undefined
     this.controller.onStateChange = undefined
+    this.controller.onArithmeticStep = undefined
     this.view.destroy()
+    this.arithmeticLabel.destroy()
     this.actionMenu.destroy()
     this.textInput.destroy()
     this.keypad.destroy();
@@ -257,10 +275,23 @@ class BasicMultistepPuzzle implements Puzzle {
       this.options.spacing + inputHeight / 2
   }
 
+  /** Shows `expression =` right-aligned against the input's left edge. */
+  private showArithmeticLabel(expression: string): void {
+    const inputWidth = this.options.inputWidth ?? 100
+    const rightEdge = this.options.x - inputWidth / 2 - BasicMultistepPuzzle.LABEL_GAP
+    this.arithmeticLabel.text(`${expression} =`)
+    this.arithmeticLabel.position({
+      x: rightEdge - this.arithmeticLabel.width(),
+      y: this.inputY() - this.arithmeticLabel.height() / 2,
+    })
+    this.arithmeticLabel.visible(true)
+  }
+
   private hideExternalControls(): void {
     this.actionMenu.hide()
     this.textInput.hide()
     this.keypad.hide()
+    this.arithmeticLabel.visible(false)
   }
 }
 

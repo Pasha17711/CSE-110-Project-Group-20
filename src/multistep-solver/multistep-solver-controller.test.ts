@@ -159,4 +159,69 @@ describe('MultistepSolverController', () => {
       expect(JSON.stringify([model.getLeftSide(), model.getRightSide()])).toBe(before)
     })
   })
+
+  describe('onArithmeticStep', () => {
+    const watch = (equation: string) => {
+      const expressions: string[] = []
+      const controller = new MultistepSolverController(new MultistepSolverModel(), fakeView())
+      controller.onArithmeticStep = expression => expressions.push(expression)
+      controller.onAnswerSubmit = (_q, playerAnswer, correctAnswer) => {
+        if (playerAnswer === correctAnswer) controller.step()
+      }
+      controller.setEquation(equation)
+      return { controller, expressions }
+    }
+
+    it('fires with the expression when an Arithmetic Step begins', () => {
+      const { controller, expressions } = watch('x + 3 = 8')
+
+      controller.operation(1, true) // + 3
+      controller.moveRequest('-')
+
+      expect(controller.getState()).toBe('Arithmetic')
+      expect(expressions).toEqual(['8 - 3'])
+    })
+
+    it('fires again for an Arithmetic Step that directly follows another', () => {
+      const { controller, expressions } = watch('x + 3 = 8 + 4')
+
+      controller.operation(1, true) // + 3
+      controller.moveRequest('-')
+      controller.arithmetic('12') // 8 + 4
+
+      expect(controller.getState()).toBe('Arithmetic')
+      expect(expressions).toEqual(['8 + 4', '12 - 3'])
+    })
+
+    it('does not fire for an Operation Step', () => {
+      const { controller, expressions } = watch('x + 3 = 8')
+
+      controller.operation(1, true)
+      controller.moveRequest('+') // wrong, so the Step stays open
+
+      expect(controller.getState()).toBe('Operation')
+      expect(expressions).toEqual([])
+    })
+
+    it('does not fire again after an incorrect Answer', () => {
+      const { controller, expressions } = watch('x + 3 = 8')
+
+      controller.operation(1, true)
+      controller.moveRequest('-')
+      controller.arithmetic('4')
+
+      expect(expressions).toEqual(['8 - 3'])
+    })
+
+    it('does not fire when the Step leaves the equation solved', () => {
+      const { controller, expressions } = watch('x + 3 = 8')
+
+      controller.operation(1, true)
+      controller.moveRequest('-')
+      controller.arithmetic('5')
+
+      expect(controller.getState()).toBe('Finished')
+      expect(expressions).toEqual(['8 - 3'])
+    })
+  })
 })

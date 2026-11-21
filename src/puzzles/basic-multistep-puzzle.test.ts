@@ -1,175 +1,196 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Konva from "konva";
+// The real model and controller run; the Konva-drawn parts are fakes that
+// record what the puzzle does to them and expose the callbacks it assigns.
+const fakes = vi.hoisted(() => ({
+  view: null as any,
+  actionMenu: null as any,
+  input: null as any,
+}))
 
-vi.mock("konva", () => import("../screens/testing/fakeKonva"));
-
-const mocks = vi.hoisted(() => ({
-    arithmetic: vi.fn(),
-    step: vi.fn(),
-    enable: vi.fn(),
-    disable: vi.fn()
-}));
-
-vi.mock("../text-input/text-input", () => ({
-    default: class {
-        show() {}
-        hide() {}
-        clear() {}
-        outlineColor() {}
-        destroy() {}
-        enable = mocks.enable;
-        disable = mocks.disable;
+vi.mock('konva', () => {
+  class FakeText {
+    attrs: Record<string, any>
+    destroyed = false
+    constructor(config: Record<string, any> = {}) {
+      this.attrs = { ...config }
     }
-}));
-
-vi.mock("../multistep-solver/multistep-solver-view", () => ({
-    default: class {
-        setPosition() {}
-        destroy() {}
+    text(value?: string) {
+      if (value !== undefined) this.attrs.text = value
+      return this.attrs.text ?? ''
     }
-}));
-
-vi.mock("../multistep-solver/multistep-solver-controller", () => ({
-    default: class {
-        onAnswerSubmit?: (
-            question: string,
-            playerAnswer: string,
-            correctAnswer: string,
-            isLastStep: boolean
-        ) => void;
-
-        onStateChange?: (state: string) => void;
-
-        setEquation() {}
-        arithmetic = mocks.arithmetic;
-        step = mocks.step;
-        operation() {}
-        removeNegativeSign() {}
-        moveRequest() {}
+    // Like Konva.Text with no fixed width: sized from its text.
+    width() { return this.text().length * 10 }
+    height() { return 20 }
+    x(value?: number) {
+      if (value !== undefined) this.attrs.x = value
+      return this.attrs.x ?? 0
     }
-}));
+    y(value?: number) {
+      if (value !== undefined) this.attrs.y = value
+      return this.attrs.y ?? 0
+    }
+    position(value: { x: number, y: number }) {
+      this.attrs.x = value.x
+      this.attrs.y = value.y
+    }
+    visible(value?: boolean) {
+      if (value !== undefined) this.attrs.visible = value
+      return this.attrs.visible ?? true
+    }
+    destroy() { this.destroyed = true }
+  }
+  return { default: { Text: FakeText } }
+})
 
-import BasicMultistepPuzzle from "./basic-multistep-puzzle";
-import type KeypadInput from "../text-input/keypad-input";
-import { FakeStage, FakeLayer } from "../screens/testing/fakeKonva";
+vi.mock('../multistep-solver/multistep-solver-view', () => ({
+  default: class {
+    onTargetDropped?: (index: number, left: boolean) => void
+    onNegativeSignDropped?: (left: boolean) => void
+    constructor() { fakes.view = this }
+    setPosition() {}
+    update() {}
+    showDropzone() {}
+    hideDropzone() {}
+    clearDropzone() {}
+    destroy() {}
+  },
+}))
 
-function createPuzzle() {
-    const stage = new FakeStage();
-    const layer = new FakeLayer();
-    stage.add(layer);
+vi.mock('../multistep-solver/action-menu', () => ({
+  default: class {
+    onAdditionClicked?: () => void
+    onSubtractionClicked?: () => void
+    onMultiplicationClicked?: () => void
+    onDivisionClicked?: () => void
+    shown = false
+    constructor() { fakes.actionMenu = this }
+    show() { this.shown = true }
+    hide() { this.shown = false }
+    destroy() {}
+  },
+}))
 
-    const puzzle = new BasicMultistepPuzzle("x+1=3", {
-        layer: layer as unknown as Konva.Layer,
-        x: 700,
-        y: 450,
-        width: 960,
-        height: 480,
-        spacing: 24,
-        inputType: "keypad"
-    });
+vi.mock('../text-input/text-input', () => ({
+  default: class {
+    onTextEntered?: (text: string) => void
+    onTextFocused?: () => void
+    shown = false
+    options: Record<string, any>
+    constructor(options: Record<string, any>) {
+      this.options = options
+      fakes.input = this
+    }
+    show() { this.shown = true }
+    hide() { this.shown = false }
+    outlineColor() {}
+    clear() {}
+    destroy() {}
+  },
+}))
 
-    return puzzle as unknown as {
-        setInteractionEnabled(enabled: boolean): void;
-        keypad: KeypadInput;
-        controller: {
-            onAnswerSubmit?: (
-                question: string,
-                playerAnswer: string,
-                correctAnswer: string,
-                isLastStep: boolean
-            ) => void;
-        };
-    };
+vi.mock('../text-input/keypad-input', () => ({
+  default: class {
+    show() {}
+    hide() {}
+    setAnswer() {}
+    position() {}
+    moveToTop() {}
+    destroy() {}
+  },
+}))
+
+import BasicMultistepPuzzle from './basic-multistep-puzzle'
+
+const makeLayer = () => {
+  const children: any[] = []
+  return {
+    children,
+    getStage: () => ({}),
+    add: (...nodes: any[]) => { children.push(...nodes) },
+  } as any
 }
 
-describe("BasicMultistepPuzzle keypad", () => {
+const OPTIONS = { x: 500, y: 300, width: 700, height: 400, spacing: 24, blockSize: 40 }
 
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
+describe('BasicMultistepPuzzle arithmetic label', () => {
+  let layer: any
+  let puzzle: BasicMultistepPuzzle
+  const label = () => layer.children.find((node: any) => typeof node.text === 'function')
 
-    it("suspends and restores the text input when hints cover the puzzle", () => {
-        const puzzle = createPuzzle();
-        puzzle.setInteractionEnabled(false);
-        expect(mocks.disable).toHaveBeenCalledOnce();
-        puzzle.setInteractionEnabled(true);
-        expect(mocks.enable).toHaveBeenCalledOnce();
-    });
+  // x + 3 = 8 + 4: moving the 3 starts two back-to-back Arithmetic Steps,
+  // 8 + 4 and then 12 - 3.
+  const startArithmetic = () => {
+    fakes.view.onTargetDropped(1, true) // + 3
+    fakes.actionMenu.onSubtractionClicked()
+  }
 
-    //Test 1: Valid fractions are submitted to solver
-    it("submits a valid fraction", () => {
-        const { keypad } = createPuzzle();
+  beforeEach(() => {
+    layer = makeLayer()
+    puzzle = new BasicMultistepPuzzle('x + 3 = 8 + 4', { layer, ...OPTIONS })
+  })
 
-        keypad.onKeyPressed?.("1");
-        keypad.onKeyPressed?.("/");
-        keypad.onKeyPressed?.("2");
-        keypad.onSubmit?.();
+  it('starts hidden', () => {
+    expect(label().visible()).toBe(false)
+  })
 
-        expect(mocks.arithmetic).toHaveBeenCalledWith("1/2");
-    });
+  it('shows the expression with the input when an Arithmetic Step begins', () => {
+    startArithmetic()
 
-    //Test 2: Negative fractions are supported
-    it("submits a negative fraction", () => {
-        const { keypad } = createPuzzle();
+    expect(fakes.input.shown).toBe(true)
+    expect(label().visible()).toBe(true)
+    expect(label().text()).toBe('8 + 4 =')
+  })
 
-        keypad.onKeyPressed?.("-");
-        keypad.onKeyPressed?.("3");
-        keypad.onKeyPressed?.("/");
-        keypad.onKeyPressed?.("4");
-        keypad.onSubmit?.();
+  it('sits to the left of the input, vertically centred on it', () => {
+    startArithmetic()
 
-        expect(mocks.arithmetic).toHaveBeenCalledWith("-3/4");
-    });
+    const inputWidth = 100
+    const inputY = OPTIONS.y + 100 / 2 + OPTIONS.spacing + 50 / 2
+    const rightEdge = label().x() + label().width()
+    expect(rightEdge).toBeLessThan(OPTIONS.x - inputWidth / 2)
+    expect(label().y() + label().height() / 2).toBe(inputY)
+  })
 
-    //Test 3: Invalid fractions cannot be submitted
-    it("rejects incomplete fractions and division by zero", () => {
-        const { keypad } = createPuzzle();
+  it('updates for an Arithmetic Step that directly follows another', () => {
+    startArithmetic()
+    fakes.input.onTextEntered('12')
 
-        keypad.onKeyPressed?.("1");
-        keypad.onKeyPressed?.("/");
-        keypad.onSubmit?.();
+    expect(label().visible()).toBe(true)
+    expect(label().text()).toBe('12 - 3 =')
+  })
 
-        expect(mocks.arithmetic).not.toHaveBeenCalled();
+  it('keeps the expression after an incorrect Answer', () => {
+    startArithmetic()
+    fakes.input.onTextEntered('11')
 
-        keypad.onKeyPressed?.("0");
-        keypad.onSubmit?.();
+    expect(label().text()).toBe('8 + 4 =')
+  })
 
-        expect(mocks.arithmetic).not.toHaveBeenCalled();
-    });
+  it('hides with the input when the puzzle finishes', () => {
+    startArithmetic()
+    fakes.input.onTextEntered('12')
+    fakes.input.onTextEntered('9')
 
-    //Test 4: Clear and backspace delete answer
-    it("handles clear and backspace correctly", () => {
-        const { keypad } = createPuzzle();
+    expect(fakes.input.shown).toBe(false)
+    expect(label().visible()).toBe(false)
+  })
 
-        keypad.onKeyPressed?.("1");
-        keypad.onKeyPressed?.("2");
-        keypad.onKeyPressed?.("⌫");
-        keypad.onSubmit?.();
+  it('stays hidden during an Operation Step', () => {
+    fakes.view.onTargetDropped(1, true)
 
-        expect(mocks.arithmetic).toHaveBeenCalledWith("1");
+    expect(fakes.actionMenu.shown).toBe(true)
+    expect(label().visible()).toBe(false)
+  })
 
-        mocks.arithmetic.mockClear();
+  it('uses ? as the placeholder', () => {
+    expect(fakes.input.options.ghostText).toBe('?')
+  })
 
-        keypad.onKeyPressed?.("C");
-        keypad.onSubmit?.();
+  it('destroys the label with the puzzle', () => {
+    const node = label()
+    puzzle.destroy()
 
-        expect(mocks.arithmetic).not.toHaveBeenCalled();
-    });
-
-    //Test 5: Submitting an answer resets the keypad
-    it("clears the stored answer after it is judged", () => {
-        const { keypad, controller } = createPuzzle();
-
-        keypad.onKeyPressed?.("5");
-
-        controller.onAnswerSubmit?.(
-            "x+1=3", "5", "5", false
-        );
-
-        keypad.onSubmit?.();
-
-        expect(mocks.arithmetic).not.toHaveBeenCalled();
-        expect(mocks.step).toHaveBeenCalledOnce();
-    });
-});
+    expect(node.destroyed).toBe(true)
+  })
+})

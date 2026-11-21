@@ -414,20 +414,22 @@ class MultistepSolverModel {
     return [variableTerm(variable, positive), '*', magnitude];
   }
 
+  /** Formats a term with every value's sign, e.g. `-x * -30`. */
   private formatTerm(side: Array<Term>, start: number, end: number): string {
-    return side.slice(start, end + 1).map((term, index) => {
+    return side.slice(start, end + 1).map(term => {
       if (typeof term === 'string') return term;
-      const value = !term.positive && index === 0
-        ? `-${term.term}`
-        : term.term;
-      return value;
+      return term.positive ? term.term : `-${term.term}`;
     }).join(' ');
   }
 
+  /**
+   * Formats a term that follows a `+` or `-`, which already shows the sign of
+   * its first value. Negative factors after `*` or `/` keep their sign.
+   */
   private formatMagnitude(side: Array<Term>, start: number, end: number): string {
-    return side.slice(start, end + 1).map(term => {
+    return side.slice(start, end + 1).map((term, index) => {
       if (typeof term === 'string') return term;
-      return term.term;
+      return term.positive || index === 0 ? term.term : `-${term.term}`;
     }).join(' ');
   }
 

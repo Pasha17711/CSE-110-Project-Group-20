@@ -65,3 +65,8 @@ export interface EndScreen extends Screen {
   onPlayAgain(cb: () => void): Unsubscribe;
   onBackToStart(cb: () => void): Unsubscribe;
 }
+
+export interface CreditsScreen extends Screen {
+  /** The player wants to return to the Start Screen. */
+  onBack(cb: () => void): Unsubscribe;
+}

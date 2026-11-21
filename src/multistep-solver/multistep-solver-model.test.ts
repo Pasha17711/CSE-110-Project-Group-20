@@ -110,6 +110,31 @@ describe('MultistepSolverModel', () => {
       expect(model.arithmeticProblems().map(([, a]) => a)).toEqual([answer])
     })
 
+    // The expression labels the arithmetic input, so a negative factor after
+    // `*` or `/` must keep its sign in the text.
+    it.each<[string, Term[], [string, string]]>([
+      [
+        'x * (-30) - x',
+        [variableTerm('x', true), '*', numberTerm('30', false), variableTerm('x', false)],
+        ['x * -30 - x', '-x * 31'],
+      ],
+      [
+        'x - x * (-7)',
+        [variableTerm('x', true), variableTerm('x', false), '*', numberTerm('7', false)],
+        ['x - x * -7', 'x * 8'],
+      ],
+      [
+        'x / (-4) - x * (-7)',
+        [variableTerm('x', true), '/', numberTerm('4', false), variableTerm('x', false), '*', numberTerm('7', false)],
+        ['x / -4 - x * -7', 'x * 27/4'],
+      ],
+    ])('shows the sign of a negative factor in the expression for %s', (_name, left, problem) => {
+      const model = new MultistepSolverModel()
+      addSide(model, left, [constantTerm(0)])
+
+      expect(model.arithmeticProblems()).toEqual([problem])
+    })
+
     it('finds problems on both sides in left-to-right order', () => {
       const model = new MultistepSolverModel()
       addSide(model,

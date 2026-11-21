@@ -46,7 +46,7 @@ view.onTargetDropped = (index, isLeftSide) => {
 }
 ```
 
-Use `controller.onStateChange` to activate the appropriate external control. Submit operation choices with `moveRequest(operation)` and arithmetic answers with `arithmetic(answer)`. Call `step()` after a correct submitted answer.
+Use `controller.onStateChange` to activate the appropriate external control. `controller.onArithmeticStep` is called with the expression to work out (e.g. `8 - 3`) each time an Arithmetic Step begins, including one that directly follows another, which `onStateChange` does not report because the state stays `Arithmetic`. `BasicMultistepPuzzle` uses it to label the input box. Submit operation choices with `moveRequest(operation)` and arithmetic answers with `arithmetic(answer)`. Call `step()` after a correct submitted answer.
 
 Useful controller methods:
 

@@ -10,6 +10,7 @@ import { StartScreen } from "./screens/StartScreen";
 import { MapScreen } from "./screens/MapScreen";
 import { RoomScreen } from "./screens/RoomScreen";
 import { EndScreen } from "./screens/EndScreen";
+import { CreditsScreen } from "./screens/CreditsScreen";
 import { Game } from "./game/Game";
 import { connectEndScreenLeaderboard } from "./endScreenLeaderboard";
 
@@ -43,11 +44,13 @@ const startScreen = new StartScreen(stage.width(), stage.height(), leaderboard);
 const mapScreen = new MapScreen(stage.width(), stage.height());
 const roomScreen = new RoomScreen(stage.width(), stage.height(), notifications);
 const endScreen = new EndScreen(stage.width(), stage.height());
+const creditsScreen = new CreditsScreen(stage.width(), stage.height());
 
 screens.register("start", startScreen);
 screens.register("map", mapScreen);
 screens.register("room", roomScreen);
 screens.register("end", endScreen);
+screens.register("credits", creditsScreen);
 screens.show("start");
 
 // Safety net: if a font finishes downloading after startup, re-center all Konva.Text nodes
@@ -69,6 +72,8 @@ function startHeist(difficulty: Difficulty): void {
 
 startScreen.onStart((difficulty) => startHeist(difficulty));
 startScreen.onAudioMuteChange((muted) => audio.setMuted(muted));
+startScreen.onCredits(() => screens.show("credits"));
+creditsScreen.onBack(() => screens.show("start"));
 
 notifications.subscribe(EventType.GameOver, () => {
   if (!game) return;
