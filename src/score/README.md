@@ -69,22 +69,47 @@ Other modules (the Room Screen's feedback, audio later) can listen to the same e
 }
 ```
 
-## Leaderboard — ⚠️ one ranking per difficulty
+## Leaderboard — online, one ranking per difficulty
 
-We originally planned one leaderboard. It is now **split by difficulty** (easy / medium / hard),
-because hard questions take longer and a single ranking isn't fair.
-The End Screen shows the ranking for the Heist's Difficulty.
+The Leaderboard is shared online (Supabase, see `supabase/README.md`) and **split by difficulty**,
+because hard questions take longer and a single ranking isn't fair. Terms are in `GLOSSARY.md`:
+each browser is a **Player**; every Escaped Heist they save is stored, but only their
+**Personal Best** per Difficulty is on the board, and every Player who saved has a **Rank**.
+
+Every call is async and never throws on a network problem: the result says what happened.
 
 ```ts
-const board = new Leaderboard();                       // saved in localStorage
-const result = board.addEntry({ playerName, difficulty, score, timeSpentMs });
-// result.status: "ranked" (with result.rank), "notRanked" (not top 10, nothing saved),
-// or "saveFailed" (storage refused it, e.g. full)
-endScreen.showSaveResult(result); // main.ts does this: one line on the End Screen
-board.getEntries(Difficulty.Hard);                     // top 10, highest score first
+const board = new Leaderboard(store);                  // main.ts picks the store (below)
+
+await board.getEntries(Difficulty.Hard);
+// { status: "loaded", entries }  top 10 Personal Bests, best first; entry.isMine marks your own
+// { status: "loadFailed" }
+
+await board.getPersonalBest(Difficulty.Hard);
+// { status: "loaded", best: { entry, rank } | null }   null = you never saved on Hard
+// { status: "loadFailed" }
+
+const result = await board.addEntry({ playerName, difficulty, score, timeSpentMs });
+// { status: "saved", rank, isNewBest, best }  rank and best are your Personal Best after the save
+// { status: "savedUnranked" }                 saved, but the rank couldn't load
+// { status: "saveFailed" }                    not saved (offline, not configured, refused)
+endScreen.showSaveResult(result);              // main.ts does this: one line on the End Screen
 ```
 
-Only an Escaped Heist can be saved (`main.ts` offers the name box only then).
+- Order: highest score, then faster time, then earlier save (then lower id). `compareEntries` and the database use the same order.
+- Names are trimmed, blank becomes `"Anonymous"`, longer than `PLAYER_NAME_MAX_LENGTH` (20) is cut down.
+- Invalid input (NaN score, negative time, unknown difficulty) rejects with a `TypeError`: that's a bug, not a network problem.
+- Only an Escaped Heist can be saved (`main.ts` offers the name box only then).
+
+### Stores
+
+`Leaderboard` talks to a `LeaderboardStore`, so tests never touch the network:
+
+| Store | Used by |
+|---|---|
+| `SupabaseLeaderboardStore` | the game, when `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` are set. Signs in anonymously on first use. Import it from its own file, not from `./score`, so tests don't load supabase-js. |
+| `UnavailableLeaderboardStore` | the game, when those env vars are missing: boards fail to load, saves fail |
+| `MemoryLeaderboardStore` | tests. `setPlayer(id)` switches Players, `seed(...)` adds runs, `failNext(op)` / `respondNext(op, value)` fake failures and bad rows |
 
 ## Rules (for reference)
 
