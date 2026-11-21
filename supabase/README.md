@@ -8,6 +8,7 @@ setup: the files in `migrations/` are run by hand in the dashboard's
 |---|---|
 | `0001_leaderboard_entries.sql` | Already applied (made in the dashboard). Kept as a record. |
 | `0002_players.sql` | Run once. Deletes existing test rows. |
+| `0003_grants.sql` | Run once. Lets signed-in Players read and insert. |
 
 The project also needs **Authentication → Sign In / Providers → Allow anonymous
 sign-ins** turned on. Each browser signs in anonymously and becomes a Player.
