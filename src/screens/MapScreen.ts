@@ -7,7 +7,7 @@ import type { MapScreen as MapScreenContract, Unsubscribe } from "./contracts";
 import { Hud } from "./Hud";
 import { DESIGN_HEIGHT, DESIGN_WIDTH, fitLayer } from "./layout";
 import { Listeners } from "./listeners";
-import { COLORS, BONUS_COLORS, VAULT_COLORS, createText, setCursor } from "./theme";
+import { COLORS, BONUS_COLORS, VAULT_COLORS, PUZZLE_COLORS, createText, setCursor } from "./theme";
 
 export type RoomState = "open" | "locked" | "solved";
 
@@ -41,30 +41,6 @@ const GRID_AREA = {
   height: 695,
   gap: 16,
 };
-
-const PUZZLE_COLORS = {
-  powerBox: {
-    floor: "#b5e1e5ff",       
-    border: "black",   
-    button: "#a5f3fc", 
-    stroke: "#0e7490", 
-    text: "#164e63", 
-  },
-  laser: {
-    floor: "#dfbcd0ff", 
-    border: "black", 
-    button: "#fce7f3",
-    stroke: "#be185d",
-    text: "#831843",
-  },
-  multistep: {
-    floor: COLORS.room,    // Default room floor
-    border: "black",
-    button: COLORS.button,
-    stroke: COLORS.purple,
-    text: COLORS.purple,
-  },
-} as const;
 
 export class MapScreen implements MapScreenContract {
   readonly layer = new Konva.Layer();
@@ -248,8 +224,8 @@ export class MapScreen implements MapScreenContract {
     const totalGapW = (cols - 1) * GRID_AREA.gap;
     const totalGapH = (rows - 1) * GRID_AREA.gap;
 
-    const tileWidth = Math.floor((GRID_AREA.width - totalGapW) / cols);
-    const tileHeight = Math.floor((GRID_AREA.height - totalGapH) / rows);
+    const tileWidth = (GRID_AREA.width - totalGapW) / cols;
+    const tileHeight = (GRID_AREA.height - totalGapH) / rows;
 
     const placedRooms = grid.getAllRooms();
 
@@ -257,12 +233,19 @@ export class MapScreen implements MapScreenContract {
       const effectiveColSpan = visualColSpan ?? colSpan;
       const effectiveRowSpan = visualRowSpan ?? rowSpan;
 
-      const rx = GRID_AREA.x + column * (tileWidth + GRID_AREA.gap);
-      const ry = GRID_AREA.y + row * (tileHeight + GRID_AREA.gap);
+      const rx = Math.round(GRID_AREA.x + column * (tileWidth + GRID_AREA.gap));
+      const ry = Math.round(GRID_AREA.y + row * (tileHeight + GRID_AREA.gap));
 
-      const roomWidth = effectiveColSpan * tileWidth + (effectiveColSpan - 1) * GRID_AREA.gap;
-      const roomHeight = effectiveRowSpan * tileHeight + (effectiveRowSpan - 1) * GRID_AREA.gap;
+      const rightEdge = Math.round(
+        GRID_AREA.x + (column + effectiveColSpan) * tileWidth + (column + effectiveColSpan - 1) * GRID_AREA.gap
+      );
+      const bottomEdge = Math.round(
+        GRID_AREA.y + (row + effectiveRowSpan) * tileHeight + (row + effectiveRowSpan - 1) * GRID_AREA.gap
+      );
 
+      const roomWidth = rightEdge - rx;
+      const roomHeight = bottomEdge - ry;
+      
       // Centered button inside tile bounds
       const bx = rx + Math.max(0, (roomWidth - BUTTON.width) / 2);
       const by = ry + Math.max(0, (roomHeight - BUTTON.height) / 2);
