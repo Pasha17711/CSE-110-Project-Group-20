@@ -16,7 +16,7 @@ function parts(hud: Hud) {
     timeNode: hud.findOne<Konva.Text>(".hud-time")!,
     time: hud.findOne<Konva.Text>(".hud-time")!.text(),
     bar: hud.findOne<Konva.Group>(".hud-bar")!.clipWidth(),
-    barFill: barGroup.findOne<Konva.Rect>("Rect")!,
+    barFill: barGroup.findOne<Konva.Rect>(".hud-bar-fill")!,
     barOutline: hud.findOne<Konva.Rect>(".hud-bar-outline")!,
     penalty: hud.findOne<Konva.Text>(".hud-penalty")!,
   };

@@ -59,6 +59,7 @@ export class Hud extends Konva.Group {
       ...BAR,
       cornerRadius: BAR.height,
       fill: COLORS.green,
+      name: "hud-bar-fill"
     });
     this.barClip.add(this.barFill);
 
@@ -67,6 +68,7 @@ export class Hud extends Konva.Group {
       cornerRadius: BAR.height,
       stroke: "black",
       strokeWidth: 3,
+      name: "hud-bar-outline"
     });
     this.add(this.barOutline);
 
