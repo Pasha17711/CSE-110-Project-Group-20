@@ -599,15 +599,15 @@ this.reviewStatusBubble = new Konva.Rect({
     switch (result.status) {
       case "ranked":
         this.saveMessage.text(`Saved! You're #${result.rank} on the ${difficulty} leaderboard.`);
-        this.saveMessage.fill("#15803d");
+        this.saveMessage.fill(COLORS.saveGreen);
         break;
       case "notRanked":
         this.saveMessage.text(`Not on the ${difficulty} leaderboard this time. Try again!`);
-        this.saveMessage.fill("#b45309");
+        this.saveMessage.fill(COLORS.saveOrange);
         break;
       case "saveFailed":
         this.saveMessage.text("Couldn't save your score: browser storage is full or blocked.");
-        this.saveMessage.fill("#b91c1c");
+        this.saveMessage.fill(COLORS.saveRed);
         break;
     }
     this.saveMessage.visible(true);
