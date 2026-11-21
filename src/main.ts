@@ -10,7 +10,8 @@ import { StartScreen } from "./screens/StartScreen";
 import { MapScreen } from "./screens/MapScreen";
 import { RoomScreen } from "./screens/RoomScreen";
 import { EndScreen } from "./screens/EndScreen";
-import { Game, type HeistResult } from "./game/Game";
+import { Game } from "./game/Game";
+import { connectEndScreenLeaderboard } from "./endScreenLeaderboard";
 
 /**
  * The only place that creates app-scoped objects and connects the Heist
@@ -56,21 +57,12 @@ document.fonts.addEventListener("loadingdone", () => {
 });
 
 let game: Game | null = null;
-let lastResult: HeistResult | null = null;
-let scoreSaved = false;
-/** Bumped by each End Screen board load, so a slower, older load can't overwrite a newer one. */
-let boardRequest = 0;
-
-// A convenience only: the name box starts with the last name saved in this browser.
-const PLAYER_NAME_KEY = "heist-player-name";
-try {
-  endScreen.suggestName(localStorage.getItem(PLAYER_NAME_KEY) ?? "");
-} catch {
-  // Storage blocked: start with an empty name box.
-}
+let lastDifficulty: Difficulty | null = null;
+const endLeaderboard = connectEndScreenLeaderboard(endScreen, leaderboard);
 
 function startHeist(difficulty: Difficulty): void {
   game?.dispose();
+  lastDifficulty = difficulty;
   game = new Game(difficulty, { notifications, screens, mapScreen, roomScreen });
   game.start();
 }
@@ -83,45 +75,12 @@ notifications.subscribe(EventType.GameOver, () => {
   const result = game.getResult();
   game.dispose();
   game = null;
-  lastResult = result;
-  scoreSaved = false;
-  endScreen.setResult(result);
+  endLeaderboard.showResult(result);
   screens.show("end");
-  void refreshEndLeaderboard(result);
-});
-
-/** Loads the End Screen's Leaderboard, unless another Heist ended or a newer load started meanwhile. */
-async function refreshEndLeaderboard(result: HeistResult): Promise<void> {
-  const request = ++boardRequest;
-  const loaded = await leaderboard.getEntries(result.snapshot.difficulty);
-  if (lastResult !== result || request !== boardRequest) return;
-  endScreen.setLeaderboard(loaded);
-}
-
-endScreen.onSaveScore(async (playerName) => {
-  if (!lastResult || lastResult.outcome !== "escaped" || scoreSaved) return;
-  // Set before the first await so a second submit can't save twice.
-  scoreSaved = true;
-  const result = lastResult;
-  const { difficulty, score, timeSpentMs } = result.snapshot;
-  const saveResult = await leaderboard.addEntry({ playerName, difficulty, score, timeSpentMs });
-  if (lastResult !== result) return;
-  endScreen.showSaveResult(saveResult);
-  if (saveResult.status === "saveFailed") {
-    scoreSaved = false; // the End Screen offers the name box again
-    return;
-  }
-  try {
-    localStorage.setItem(PLAYER_NAME_KEY, playerName);
-  } catch {
-    // Storage blocked: the name just isn't remembered.
-  }
-  endScreen.suggestName(playerName);
-  await refreshEndLeaderboard(result);
 });
 
 endScreen.onPlayAgain(() => {
-  if (lastResult) startHeist(lastResult.snapshot.difficulty);
+  if (lastDifficulty !== null) startHeist(lastDifficulty);
 });
 
 endScreen.onBackToStart(() => {
