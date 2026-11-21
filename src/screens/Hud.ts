@@ -6,7 +6,6 @@ const BAR = { x: 204, y: 15, width: 970, height: 50 };
 const WARNING_TIME_RATIO = 0.5;  // < 50% remaining -> yellow/orange
 const CRITICAL_TIME_RATIO = 0.2; // < 20% remaining -> red
 const WARNING_COLOR = "#f59e0b"; 
-const PENALTY_MS = WRONG_ANSWER_PENALTY_SECONDS * 1000;
 const FLASH_DURATION_MS = 900;
 
 /**
@@ -21,7 +20,6 @@ export class Hud extends Konva.Group {
   private readonly barFill: Konva.Rect;
   private readonly barOutline: Konva.Rect;
 
-  private lastTimeRemainingMs: number | null = null;
   private lastRatio = 1;
   private lastHasTime = false;
   private flashTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -105,17 +103,9 @@ export class Hud extends Konva.Group {
 
   /** Shows the time remaining, the bar at remaining / limit (0–1), and the money. */
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void {
-    // Reset tracking at the start of a fresh heist
     if (timeLimitMs > 0 && timeRemainingMs >= timeLimitMs) {
-      this.lastTimeRemainingMs = timeRemainingMs;
       this.clearPenaltyFlash();
-    } else if (
-      this.lastTimeRemainingMs !== null &&
-      this.lastTimeRemainingMs - timeRemainingMs >= PENALTY_MS - 500
-    ) {
-      this.triggerPenaltyFlash();
     }
-    this.lastTimeRemainingMs = timeRemainingMs;
 
     const ratio = timeLimitMs > 0 ? timeRemainingMs / timeLimitMs : 0;
     const clamped = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
@@ -128,6 +118,21 @@ export class Hud extends Konva.Group {
     this.timeLabel.text(formatTime(timeRemainingMs));
     this.moneyLabel.text(formatMoney(money));
     this.getLayer()?.batchDraw();
+  }
+
+  /** Flashes the penalty indicator, timer text, and bar outline red on an incorrect answer. */
+  showPenalty(): void {
+    this.isFlashingPenalty = true;
+    this.penaltyLabel.visible(true);
+    this.updateTimerColors();
+    this.getLayer()?.batchDraw();
+
+    if (this.flashTimeout) clearTimeout(this.flashTimeout);
+    this.flashTimeout = setTimeout(() => {
+      this.clearPenaltyFlash();
+      this.updateTimerColors();
+      this.getLayer()?.batchDraw();
+    }, FLASH_DURATION_MS);
   }
 
   private updateTimerColors(): void {
@@ -158,19 +163,6 @@ export class Hud extends Konva.Group {
     this.timeLabel.fill(timeTextColor);
   }
 
-  private triggerPenaltyFlash(): void {
-    this.isFlashingPenalty = true;
-    this.penaltyLabel.visible(true);
-    this.updateTimerColors();
-
-    if (this.flashTimeout) clearTimeout(this.flashTimeout);
-    this.flashTimeout = setTimeout(() => {
-      this.clearPenaltyFlash();
-      this.updateTimerColors();
-      this.getLayer()?.batchDraw();
-    }, FLASH_DURATION_MS);
-  }
-
   private clearPenaltyFlash(): void {
     this.isFlashingPenalty = false;
     this.penaltyLabel.visible(false);
@@ -179,7 +171,6 @@ export class Hud extends Konva.Group {
       this.flashTimeout = null;
     }
   }
-
 }
 
 /** Full width of the time bar, for tests. */
