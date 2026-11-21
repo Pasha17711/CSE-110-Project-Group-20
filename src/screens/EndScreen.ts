@@ -1,6 +1,6 @@
 import Konva from "konva";
 import TextInput from "../text-input/text-input";
-import { DIFFICULTY_LABEL, LEADERBOARD_SIZE, formatMoney, formatTime, type AddEntryResult, type LeaderboardEntry } from "../score";
+import { DIFFICULTY_LABEL, LEADERBOARD_SIZE, PLAYER_NAME_MAX_LENGTH, formatMoney, formatTime, type AddEntryResult, type LeaderboardEntry, type LoadResult } from "../score";
 import type { HeistResult } from "../game/Game";
 import type { EndScreen as EndScreenContract, Unsubscribe } from "./contracts";
 import { DESIGN_WIDTH, DESIGN_HEIGHT, fitLayer } from "./layout";
@@ -18,6 +18,9 @@ const STATS = { x: PANEL.x + 58, y: COLUMN_Y + 26, width: 485, rowHeight: 46 };
 const BOARD = { x: DESIGN_WIDTH / 2 + 35, y: STATS.y, width: PANEL.width / 2 - 128, rowHeight: 36 };
 /** The name box's TextInput, centered at (x, y), under the stats column. */
 const NAME_BOX = { x: STATS.x + 150, y: PANEL.y + PANEL.height - 59, width: 300, height: 50 };
+const NAME_PROMPT = "Enter your name to save your score";
+/** Behind the current Player's rows. */
+const MINE_FILL = "rgba(255, 212, 71, 0.45)";
 
 /**
  * Shown after a Heist ends: the outcome, the results, the leaderboard for
@@ -53,13 +56,21 @@ export class EndScreen implements EndScreenContract {
   private readonly boardTitle: Konva.Text;
   private readonly boardRows = new Konva.Group({ listening: false });
   private readonly nameBox: Konva.Group;
+  /** Above the name box: what to do, or why the last save failed. */
+  private readonly namePrompt: Konva.Text;
+  private readonly saveButton: Konva.Group;
   private readonly nameInput: TextInput;
   /** Where the name box was: how saving went, once the player has saved. */
   private readonly saveMessage: Konva.Text;
 
   private result: HeistResult | null = null;
-  /** True once this result's score has been handed to onSaveScore. */
-  private saved = false;
+  /** "saving" from onSaveScore until showSaveResult; a failed save goes back to "open". */
+  private saveState: "open" | "saving" | "saved" = "open";
+  private board: { status: "loading" } | LoadResult = { status: "loading" };
+  /** The Player's Personal Best after saving, pinned under the board when it's outside the top rows. */
+  private pinned: { entry: LeaderboardEntry; rank: number } | null = null;
+  /** Filled into the name box for each new result. */
+  private suggestedName = "";
 
   private readonly reviewModal = new Konva.Group({
     visible:false,
@@ -133,18 +144,20 @@ export class EndScreen implements EndScreenContract {
     this.layer.add(this.boardTitle, this.boardRows);
 
     this.nameBox = new Konva.Group({ visible: false, name: "name-box" });
-    this.nameBox.add(createText({
+    this.namePrompt = createText({
       x: STATS.x, y: NAME_BOX.y - 70, width: STATS.width,
-      text: "Enter your name to save your score",
+      text: NAME_PROMPT,
       fontSize: 24, fill: COLORS.purple,
-    }));
-    this.nameBox.add(createButton({
+      name: "name-prompt",
+    });
+    this.saveButton = createButton({
       x: NAME_BOX.x + NAME_BOX.width / 2 + 24, y: NAME_BOX.y - NAME_BOX.height / 2 + 2,
       width: 140, height: 43,
       label: "Save",
       name: "save",
       onClick: () => this.submitName(this.nameInput.text()),
-    }));
+    });
+    this.nameBox.add(this.namePrompt, this.saveButton);
     this.layer.add(this.nameBox);
 
     this.saveMessage = createText({
@@ -166,6 +179,7 @@ export class EndScreen implements EndScreenContract {
       foregroundColor: "#000000",
       ghostText: "Your name",
       ghostTextColor: "#aaaaaa",
+      maxLength: PLAYER_NAME_MAX_LENGTH,
     });
     this.nameInput.onTextEntered = (text) => this.submitName(text);
 
@@ -364,13 +378,16 @@ this.reviewStatusBubble = new Konva.Rect({
 
   }
 
-  setResult(result: HeistResult, leaderboard: LeaderboardEntry[]): void {
+  setResult(result: HeistResult): void {
     if (result !== this.result) {
       this.reviewModal.hide();
       this.result = result;
-      this.saved = false;
-      this.nameInput.clear();
+      this.saveState = "open";
+      this.board = { status: "loading" };
+      this.pinned = null;
+      this.nameInput.setText(this.suggestedName);
       this.saveMessage.visible(false);
+      this.showSaveControls();
     }
 
     const { outcome, snapshot } = result;
@@ -445,9 +462,19 @@ this.reviewStatusBubble = new Konva.Rect({
     this.setStat("incorrect", String(snapshot.incorrectAnswers));
 
     this.boardTitle.text(`Leaderboard: ${DIFFICULTY_LABEL[snapshot.difficulty]}`);
-    this.renderLeaderboard(leaderboard);
+    this.renderLeaderboard();
     this.refreshNameBox();
     this.layer.batchDraw();
+  }
+
+  setLeaderboard(board: LoadResult): void {
+    this.board = board;
+    this.renderLeaderboard();
+    this.layer.batchDraw();
+  }
+
+  suggestName(name: string): void {
+    this.suggestedName = name;
   }
 
   private showReviewQuestion(): void {
@@ -580,6 +607,16 @@ this.reviewStatusBubble = new Konva.Rect({
   }
 
   showSaveResult(result: AddEntryResult): void {
+    if (result.status === "saveFailed") {
+      // The name box comes back so the player can try again.
+      this.saveState = "open";
+      this.showSaveControls("Couldn't save your score. Try again.");
+      this.refreshNameBox();
+      this.layer.batchDraw();
+      return;
+    }
+
+    this.saveState = "saved";
     const difficulty = this.result ? DIFFICULTY_LABEL[this.result.snapshot.difficulty] : "";
     switch (result.status) {
       case "saved": {
@@ -589,18 +626,17 @@ this.reviewStatusBubble = new Konva.Rect({
         const nudge = result.rank > LEADERBOARD_SIZE ? ` Top ${LEADERBOARD_SIZE} next time!` : "";
         this.saveMessage.text(message + nudge);
         this.saveMessage.fill(result.isNewBest ? COLORS.green : COLORS.gold);
+        this.pinned = { entry: result.best, rank: result.rank };
         break;
       }
       case "savedUnranked":
         this.saveMessage.text("Saved! Couldn't load the leaderboard to show your rank.");
         this.saveMessage.fill(COLORS.gold);
         break;
-      case "saveFailed":
-        this.saveMessage.text("Couldn't save your score. Check your connection and try again.");
-        this.saveMessage.fill(COLORS.red);
-        break;
     }
     this.saveMessage.visible(true);
+    this.renderLeaderboard();
+    this.refreshNameBox();
     this.layer.batchDraw();
   }
 
@@ -646,37 +682,67 @@ this.reviewStatusBubble = new Konva.Rect({
     this.statValues.get(key)?.text(value);
   }
 
-  private renderLeaderboard(entries: LeaderboardEntry[]): void {
+  /**
+   * Draws the board: loading, failed, empty, or the top rows with the
+   * Player's own rows highlighted. A Personal Best outside the top rows
+   * takes the last row, with its real Rank.
+   */
+  private renderLeaderboard(): void {
     this.boardRows.destroyChildren();
-    if (entries.length === 0) {
-      this.boardRows.add(createText({ width: BOARD.width, text: "No saved scores yet.", fontStyle: "normal", fill: COLORS.purple }));
+    const board = this.board;
+    if (board.status !== "loaded") {
+      const text = board.status === "loading" ? "Loading leaderboard…" : "Couldn't load the leaderboard.";
+      this.boardRows.add(createText({ width: BOARD.width, text, fontStyle: "normal", fill: COLORS.purple, name: "board-status" }));
       return;
     }
-    entries.forEach((entry, i) => {
-      const y = i * BOARD.rowHeight;
-      const row = new Konva.Group({ y, name: "leaderboard-row" });
-      row.add(createText({ width: 48, text: `${i + 1}.`, fontStyle: "normal", fill: COLORS.purple }));
-      row.add(createText({ x: 48, width: BOARD.width - 280, text: entry.playerName, fontStyle: "normal", fill: COLORS.purple, ellipsis: true, wrap: "none" }));
+
+    const rows = board.entries.map((entry, i) => ({ entry, rank: i + 1 }));
+    const pinned = this.pinned;
+    if (pinned && !board.entries.some((entry) => entry.id === pinned.entry.id)) {
+      rows.splice(LEADERBOARD_SIZE - 1, rows.length, pinned);
+    }
+    if (rows.length === 0) {
+      this.boardRows.add(createText({ width: BOARD.width, text: "No saved scores yet.", fontStyle: "normal", fill: COLORS.purple, name: "board-status" }));
+      return;
+    }
+    rows.forEach(({ entry, rank }, i) => {
+      const row = new Konva.Group({ y: i * BOARD.rowHeight, name: "leaderboard-row" });
+      if (entry.isMine) {
+        row.add(new Konva.Rect({ x: -8, y: -5, width: BOARD.width + 16, height: BOARD.rowHeight - 2, cornerRadius: 8, fill: MINE_FILL, name: "mine-highlight" }));
+      }
+      row.add(createText({ width: 60, text: `${rank}.`, fontStyle: "normal", fill: COLORS.purple }));
+      row.add(createText({ x: 60, width: BOARD.width - 292, text: entry.playerName, fontStyle: "normal", fill: COLORS.purple, ellipsis: true, wrap: "none" }));
       row.add(createText({ x: BOARD.width - 232, width: 120, text: entry.score.toLocaleString("en-US"), align: "right", fill: COLORS.purple }));
       row.add(createText({ x: BOARD.width - 112, width: 112, text: formatTime(entry.timeSpentMs), align: "right", fontStyle: "normal", fill: COLORS.purple }));
       this.boardRows.add(row);
     });
   }
 
-  /** The name box shows only while visible, Escaped, and not saved yet. */
+  /** The name box shows only while visible, Escaped, and not saved yet (it stays up while saving). */
   private refreshNameBox(): void {
-    const offered = this.layer.visible() && !this.reviewModal.visible() && this.result?.outcome === "escaped" && !this.saved;
+    const offered = this.layer.visible() && !this.reviewModal.visible() && this.result?.outcome === "escaped" && this.saveState !== "saved";
     this.nameBox.visible(offered);
     if (offered) this.nameInput.show(NAME_BOX.x, NAME_BOX.y);
     else this.nameInput.hide();
   }
 
+  /** Greys out Save while a save is in flight. `error` replaces the prompt after a failed save. */
+  private showSaveControls(error?: string): void {
+    const saving = this.saveState === "saving";
+    this.saveButton.opacity(saving ? 0.5 : 1);
+    this.saveButton.listening(!saving);
+    this.saveButton.findOne<Konva.Text>(".label")?.text(saving ? "Saving…" : "Save");
+    this.namePrompt.text(error ?? NAME_PROMPT);
+    this.namePrompt.fill(error ? COLORS.red : COLORS.purple);
+  }
+
   private submitName(text: string): void {
     const name = text.trim();
     // An empty box (e.g. on blur) isn't a save.
-    if (!name || this.saved || this.result?.outcome !== "escaped" || !this.nameBox.visible()) return;
-    this.saved = true;
-    this.refreshNameBox();
+    if (!name || this.saveState !== "open" || this.result?.outcome !== "escaped" || !this.nameBox.visible()) return;
+    this.saveState = "saving";
+    this.showSaveControls();
+    this.layer.batchDraw();
     this.saves.emit(name);
   }
 }

@@ -58,6 +58,16 @@ document.fonts.addEventListener("loadingdone", () => {
 let game: Game | null = null;
 let lastResult: HeistResult | null = null;
 let scoreSaved = false;
+/** Bumped by each End Screen board load, so a slower, older load can't overwrite a newer one. */
+let boardRequest = 0;
+
+// A convenience only: the name box starts with the last name saved in this browser.
+const PLAYER_NAME_KEY = "heist-player-name";
+try {
+  endScreen.suggestName(localStorage.getItem(PLAYER_NAME_KEY) ?? "");
+} catch {
+  // Storage blocked: start with an empty name box.
+}
 
 function startHeist(difficulty: Difficulty): void {
   game?.dispose();
@@ -75,16 +85,17 @@ notifications.subscribe(EventType.GameOver, () => {
   game = null;
   lastResult = result;
   scoreSaved = false;
-  endScreen.setResult(result, []);
+  endScreen.setResult(result);
   screens.show("end");
   void refreshEndLeaderboard(result);
 });
 
-/** Loads the End Screen's Leaderboard, unless another Heist ended in the meantime. */
+/** Loads the End Screen's Leaderboard, unless another Heist ended or a newer load started meanwhile. */
 async function refreshEndLeaderboard(result: HeistResult): Promise<void> {
+  const request = ++boardRequest;
   const loaded = await leaderboard.getEntries(result.snapshot.difficulty);
-  if (lastResult !== result) return;
-  endScreen.setResult(result, loaded.status === "loaded" ? loaded.entries : []);
+  if (lastResult !== result || request !== boardRequest) return;
+  endScreen.setLeaderboard(loaded);
 }
 
 endScreen.onSaveScore(async (playerName) => {
@@ -96,6 +107,16 @@ endScreen.onSaveScore(async (playerName) => {
   const saveResult = await leaderboard.addEntry({ playerName, difficulty, score, timeSpentMs });
   if (lastResult !== result) return;
   endScreen.showSaveResult(saveResult);
+  if (saveResult.status === "saveFailed") {
+    scoreSaved = false; // the End Screen offers the name box again
+    return;
+  }
+  try {
+    localStorage.setItem(PLAYER_NAME_KEY, playerName);
+  } catch {
+    // Storage blocked: the name just isn't remembered.
+  }
+  endScreen.suggestName(playerName);
   await refreshEndLeaderboard(result);
 });
 

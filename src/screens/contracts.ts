@@ -3,7 +3,7 @@ import type { StepAnswer } from "../questions/Question";
 import type { Room } from "../map/Room";
 import type { MapGrid } from "../map/MapGrid";
 import type { AccessDeniedPayload } from "../map/MapController";
-import type { AddEntryResult, Difficulty, LeaderboardEntry } from "../score";
+import type { AddEntryResult, Difficulty, LoadResult } from "../score";
 import type { HeistResult } from "../game/Game";
 
 /**
@@ -45,10 +45,21 @@ export interface RoomScreen extends Screen {
 }
 
 export interface EndScreen extends Screen {
-  setResult(result: HeistResult, leaderboard: LeaderboardEntry[]): void;
-  /** Only offered when result.outcome === "escaped". */
+  /** A new result resets the screen, with the leaderboard shown as loading. */
+  setResult(result: HeistResult): void;
+  /** The current result's Difficulty's Leaderboard, or that it couldn't load. */
+  setLeaderboard(board: LoadResult): void;
+  /** Filled into the name box for each new result (the last name saved). */
+  suggestName(name: string): void;
+  /**
+   * Only offered when result.outcome === "escaped". Save stays greyed out
+   * until showSaveResult.
+   */
   onSaveScore(cb: (playerName: string) => void): Unsubscribe;
-  /** One line saying how saving went (rank, didn't make the board, or failed). */
+  /**
+   * How saving went: the Rank, or saved without one. After "saveFailed" the
+   * name box comes back so the player can try again.
+   */
   showSaveResult(result: AddEntryResult): void;
   /** A new Heist at the same Difficulty. */
   onPlayAgain(cb: () => void): Unsubscribe;
