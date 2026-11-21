@@ -149,12 +149,13 @@ describe("MapScreen", () => {
     screen.setGrid(grid, new Set());
 
     // 3x3 grid inside GRID_AREA (width: 1207, height: 695, gap: 16)
-    const tileWidth = Math.floor((1207 - 2 * 16) / 3);
-    const tileHeight = Math.floor((695 - 2 * 16) / 3);
+    const tileWidth = (1207 - 2 * 16) / 3;
+    const tileHeight = (695 - 2 * 16) / 3;
 
     // Room C has colSpan: 2, visualColSpan: 1.5
     const roomCFloor = floor("room_c");
-    const expectedCWidth = 1.5 * tileWidth + (1.5 - 1) * 16;
+    const expectedCWidth =
+      Math.round(116 + 1.5 * tileWidth + 0.5 * 16) - 116;
     expect(roomCFloor.width()).toBe(expectedCWidth);
 
     const roomCButton = button("room_c");
@@ -163,7 +164,8 @@ describe("MapScreen", () => {
 
     // Vault has rowSpan: 2 and no visual override -> uses full 2-row height
     const vaultFloor = floor("vault");
-    const expectedVaultHeight = 2 * tileHeight + 16;
+    const expectedVaultHeight =
+      Math.round(142 + 2 * tileHeight + 16) - 142;
     expect(vaultFloor.height()).toBe(expectedVaultHeight);
   });
 

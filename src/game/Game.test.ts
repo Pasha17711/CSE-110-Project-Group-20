@@ -11,6 +11,7 @@ import {
 } from "../score";
 import type { Room } from "../map/Room";
 import type { MapGrid } from "../map/MapGrid";
+import type { MapFloor } from "../map/MapLayout";
 import type { AccessDeniedPayload } from "../map/MapController";
 import type { Question, StepAnswer } from "../questions/Question";
 import type { ScreenController } from "../screens/ScreenController";
@@ -38,10 +39,11 @@ class Slot<T extends unknown[]> {
   }
 }
 
-/** MapScreen fake: records grid state from Game and provides room click hooks. */
+/** MapScreen fake: records grid/floor state from Game and provides room click hooks. */
 class FakeMapScreen implements MapScreen {
   readonly layer = {} as Konva.Layer;
   grid: MapGrid | null = null;
+  floors: readonly MapFloor[] = [];
   rooms: readonly Room[] = [];
   solved: string[] = [];
   hud: Hud | null = null;
@@ -54,6 +56,20 @@ class FakeMapScreen implements MapScreen {
   setGrid(grid: MapGrid, solvedRoomIds: ReadonlySet<string>): void {
     this.grid = grid;
     this.rooms = grid.getAllRooms().map((placed) => placed.room);
+    this.solved = [...solvedRoomIds];
+  }
+
+  setFloors(
+    floors: readonly MapFloor[],
+    solvedRoomIds: ReadonlySet<string>,
+    activeFloorIndex: number = 0,
+  ): void {
+    this.floors = floors;
+    const active = floors[activeFloorIndex] ?? floors[0];
+    if (active) {
+      this.grid = active.grid;
+    }
+    this.rooms = floors.flatMap((f) => f.grid.getAllRooms().map((placed) => placed.room));
     this.solved = [...solvedRoomIds];
   }
 
@@ -76,7 +92,7 @@ class FakeMapScreen implements MapScreen {
   room(id: string): Room {
     const target = id.toLowerCase();
     const found = this.rooms.find(
-      (r) => r.id === id || r.id.toLowerCase() === target
+      (r) => r.id === id || r.id.toLowerCase() === target,
     );
     if (!found) throw new Error(`no room ${id}`);
     return found;
@@ -181,6 +197,17 @@ describe("Game", () => {
     roomScreen.submit(lastStep(mapScreen.room(id).question));
   }
 
+  /** Solves the full Easy prerequisite chain leading up to (but not including) the Vault. */
+  function solveEasyPathToVault(): void {
+    enterAndSolve("room_a");
+    enterAndSolve("room_b");
+    enterAndSolve("room_c");
+    enterAndSolve("room_d");
+    enterAndSolve("room_e");
+    enterAndSolve("room_f");
+    enterAndSolve("room_g");
+  }
+
   function count(type: EventType): number {
     return events.filter((e) => e === type).length;
   }
@@ -203,14 +230,27 @@ describe("Game", () => {
     vi.useRealTimers();
   });
 
-  it("start() sends GameStart, gives MapScreen the 5 Rooms with none Solved, sets both HUDs and shows the map", () => {
+  it("start() sends GameStart, gives MapScreen the 10 Easy Rooms across 2 floors with none Solved, sets both HUDs and shows the map", () => {
     game.start();
 
     expect(events).toEqual([EventType.GameStart]);
     expect(mapScreen.grid).not.toBeNull();
-    expect(mapScreen.rooms).toHaveLength(5);
+    expect(mapScreen.rooms).toHaveLength(10);
     const roomIds = new Set(mapScreen.rooms.map((r) => r.id.toLowerCase()));
-    expect(roomIds).toEqual(new Set(["room_a", "room_b", "room_c", "room_x", "vault"]));
+    expect(roomIds).toEqual(
+      new Set([
+        "room_a",
+        "room_b",
+        "room_c",
+        "room_d",
+        "bonus_1",
+        "room_e",
+        "room_f",
+        "room_g",
+        "bonus_2",
+        "vault",
+      ]),
+    );
     expect(mapScreen.solved).toEqual([]);
 
     const startHud = { timeRemainingMs: DEFAULT_TIME_LIMIT_MS, timeLimitMs: DEFAULT_TIME_LIMIT_MS, money: 0 };
@@ -219,12 +259,14 @@ describe("Game", () => {
     expect(shown).toEqual(["map"]);
   });
 
-  it("uses the bank layout with room_x as the Bonus Room", () => {
+  it("uses the multi-floor Easy layout with bonus_1/bonus_2 as Bonus Rooms and prerequisites leading to Vault", () => {
     game.start();
 
-    expect(mapScreen.room("room_x").kind).toBe("bonus");
+    expect(mapScreen.room("bonus_1").kind).toBe("bonus");
+    expect(mapScreen.room("bonus_2").kind).toBe("bonus");
     expect(mapScreen.room("room_c").prerequisites).toEqual(["room_a", "room_b"]);
-    expect(mapScreen.room(VAULT_ID).prerequisites).toEqual(["room_c"]);
+    expect(mapScreen.room("room_g").prerequisites).toEqual(["room_e", "room_f"]);
+    expect(mapScreen.room(VAULT_ID).prerequisites).toEqual(["room_g"]);
   });
 
   it("generates each Room's Question once and keeps it after leaving and re-entering", () => {
@@ -258,7 +300,7 @@ describe("Game", () => {
 
     expect(mapScreen.denied).toHaveLength(1);
     expect(mapScreen.denied[0].missingPrerequisiteIds).toEqual(["room_a", "room_b"]);
-    expect(mapScreen.denied[0].missingPrerequisiteNames).toEqual(["Room A", "Room B"]);
+    expect(mapScreen.denied[0].missingPrerequisiteNames).toEqual(["KEYPAD A", "POWERBOX A"]);
     expect(shown).toEqual(["map"]);
     expect(mapScreen.hud?.timeRemainingMs).toBe(DEFAULT_TIME_LIMIT_MS);
   });
@@ -268,7 +310,7 @@ describe("Game", () => {
 
     mapScreen.click("room_a");
     expect(roomScreen.question).toBe(mapScreen.room("room_a").question);
-    expect(roomScreen.roomName).toBe("Room A");
+    expect(roomScreen.roomName).toBe("KEYPAD A");
     expect(shown).toEqual(["map", "room"]);
 
     vi.advanceTimersByTime(3000);
@@ -345,21 +387,19 @@ describe("Game", () => {
     expect(count(EventType.Correct)).toBe(2);
   });
 
-  it("a correct last Step in room_x earns bonus money and weight", () => {
+  it("a correct last Step in bonus_1 earns bonus money and weight", () => {
     game.start();
-    enterAndSolve("room_x");
+    enterAndSolve("bonus_1");
     expect(mapScreen.hud?.money).toBe(ROOM_MONEY.bonus);
 
-    enterAndSolve("room_a");
-    enterAndSolve("room_b");
-    enterAndSolve("room_c");
+    solveEasyPathToVault();
     enterAndSolve(VAULT_ID);
 
     const { snapshot } = game.getResult();
     expect(snapshot.bonusRoomsSolved).toBe(1);
-    expect(snapshot.roomsSolved).toBe(5);
-    expect(snapshot.money).toBe(ROOM_MONEY.bonus + 4 * ROOM_MONEY.main);
-    expect(snapshot.weightedCorrect).toBe(ROOM_SCORE_WEIGHT.bonus + 4 * ROOM_SCORE_WEIGHT.main);
+    expect(snapshot.roomsSolved).toBe(9);
+    expect(snapshot.money).toBe(ROOM_MONEY.bonus + 8 * ROOM_MONEY.main);
+    expect(snapshot.weightedCorrect).toBe(ROOM_SCORE_WEIGHT.bonus + 8 * ROOM_SCORE_WEIGHT.main);
   });
 
   it("a Solved Room can't be re-entered", () => {
@@ -375,9 +415,7 @@ describe("Game", () => {
 
   it("solving the Vault sends GameOver once and the outcome is escaped", () => {
     game.start();
-    enterAndSolve("room_a");
-    enterAndSolve("room_b");
-    enterAndSolve("room_c");
+    solveEasyPathToVault();
 
     enterAndSolve(VAULT_ID);
 
@@ -419,9 +457,7 @@ describe("Game", () => {
 
   it("a correct last Step after the clock hit zero between ticks ends caught, not escaped", () => {
     game.start();
-    enterAndSolve("room_a");
-    enterAndSolve("room_b");
-    enterAndSolve("room_c");
+    solveEasyPathToVault();
     mapScreen.click(VAULT_ID);
     vi.setSystemTime(Date.now() + DEFAULT_TIME_LIMIT_MS);
 
@@ -442,10 +478,14 @@ describe("Game", () => {
     roomScreen.submit(lastStep(question));
     enterAndSolve("room_b");
     enterAndSolve("room_c");
+    enterAndSolve("room_d");
+    enterAndSolve("room_e");
+    enterAndSolve("room_f");
+    enterAndSolve("room_g");
     enterAndSolve(VAULT_ID);
 
     const { history } = game.getResult();
-    expect(history).toHaveLength(9);
+    expect(history).toHaveLength(17);
     expect(history.slice(0, 3)).toMatchObject([
       { question, playerAnswer: "+", correctAnswer: "-", isCorrect: false, isLastStep: false },
       { question, playerAnswer: "-", correctAnswer: "-", isCorrect: true, isLastStep: false },
@@ -475,6 +515,10 @@ describe("Game", () => {
 
     enterAndSolve("room_b");
     enterAndSolve("room_c");
+    enterAndSolve("room_d");
+    enterAndSolve("room_e");
+    enterAndSolve("room_f");
+    enterAndSolve("room_g");
     enterAndSolve(VAULT_ID);
     const { history } = game.getResult();
     // Each wire is Step 1 of its own Question.
@@ -496,6 +540,10 @@ describe("Game", () => {
     roomScreen.submit(lastStep(question));
     enterAndSolve("room_b");
     enterAndSolve("room_c");
+    enterAndSolve("room_d");
+    enterAndSolve("room_e");
+    enterAndSolve("room_f");
+    enterAndSolve("room_g");
     enterAndSolve(VAULT_ID);
 
     expect(game.getResult().history.slice(0, 3).map((r) => r.stepNumber)).toEqual([1, 1, 2]);
