@@ -2,7 +2,9 @@ import Konva from "konva";
 import { NotificationManager } from "./notification-manager/NotificationManager";
 import { AudioManager } from "./audio/AudioManager";
 import { EventType } from "./notification-manager/GameEvent";
-import { Leaderboard, MemoryLeaderboardStore, type Difficulty } from "./score";
+import { Leaderboard, UnavailableLeaderboardStore, type Difficulty } from "./score";
+import { getSupabase } from "./score/supabaseClient";
+import { SupabaseLeaderboardStore } from "./score/SupabaseLeaderboardStore";
 import { ScreenController } from "./screens/ScreenController";
 import { StartScreen } from "./screens/StartScreen";
 import { MapScreen } from "./screens/MapScreen";
@@ -30,8 +32,10 @@ const stage = new Konva.Stage({
 const notifications = new NotificationManager();
 // One app-scoped subscriber; all sounds react to the same events as the score/HUD.
 const audio = new AudioManager(notifications);
-// In memory for now; the online store is wired up once it exists.
-const leaderboard = new Leaderboard(new MemoryLeaderboardStore({ playerId: "local" }));
+// Online only. Without the Supabase env vars, boards fail to load and saves fail.
+const supabase = getSupabase();
+if (!supabase) console.warn("VITE_SUPABASE_URL / VITE_SUPABASE_KEY not set: the leaderboard is offline.");
+const leaderboard = new Leaderboard(supabase ? new SupabaseLeaderboardStore(supabase) : new UnavailableLeaderboardStore());
 const screens = new ScreenController(stage);
 
 const startScreen = new StartScreen(stage.width(), stage.height(), leaderboard);
