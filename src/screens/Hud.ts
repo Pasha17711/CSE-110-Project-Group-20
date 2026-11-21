@@ -70,12 +70,6 @@ export class Hud extends Konva.Group {
     });
     this.add(this.barOutline);
 
-    this.add(new Konva.Rect({
-      ...BAR,
-      cornerRadius: BAR.height,
-      stroke: "black", strokeWidth: 3,
-    }));
-
     // Time remaining
     this.timeLabel = createText({
       x: BAR.x + BAR.width + 16, y: BAR.y, width: 230, height: BAR.height,
