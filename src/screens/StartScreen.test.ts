@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("konva", () => import("./testing/fakeKonva"));
 
+import type Konva from "konva";
 import { StartScreen } from "./StartScreen";
 import { Difficulty, Leaderboard, MemoryLeaderboardStore, formatTime } from "../score";
 import { visibleTexts } from "./testing/fakeKonva";
@@ -161,7 +162,7 @@ describe("StartScreen", () => {
     expect(visibleTexts(screen.layer)).toContain("No Medium scores recorded yet.\nComplete a heist to claim #1!");
   });
 
-  it("shows the empty board when the leaderboard can't load", async () => {
+  it("says so when the leaderboard can't load", async () => {
     const store = new MemoryLeaderboardStore({ playerId: "p" });
     store.failNext("fetchTop");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -170,8 +171,79 @@ describe("StartScreen", () => {
     click(screen, "trophy-button");
     await flush();
 
-    expect(visibleTexts(screen.layer)).toContain("No Easy scores recorded yet.\nComplete a heist to claim #1!");
+    expect(visibleTexts(screen.layer)).toContain("Couldn't load the leaderboard.\nCheck your connection and try again.");
     errorSpy.mockRestore();
+  });
+
+  it("shows Loading… until the board arrives", async () => {
+    const screen = new StartScreen(1440, 900, new Leaderboard(new MemoryLeaderboardStore({ playerId: "p" })));
+
+    click(screen, "trophy-button");
+    expect(visibleTexts(screen.layer)).toContain("Loading…");
+
+    await flush();
+    expect(visibleTexts(screen.layer)).not.toContain("Loading…");
+  });
+
+  it("highlights the current Player's rows", async () => {
+    const store = new MemoryLeaderboardStore({ playerId: "me" });
+    store.seed({ playerId: "ana", playerName: "Ana", difficulty: Difficulty.Easy, score: 900, timeSpentMs: 1 });
+    store.seed({ playerId: "me", playerName: "Me", difficulty: Difficulty.Easy, score: 800, timeSpentMs: 1 });
+    const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+    click(screen, "trophy-button");
+    await flush();
+
+    const rows = screen.layer.find(".leaderboard-row");
+    expect(rows.map((row) => (row as Konva.Group).findOne(".mine-highlight") !== undefined)).toEqual([false, true]);
+  });
+
+  describe("Personal Best line", () => {
+    function personalBest(screen: StartScreen): string {
+      return screen.layer.findOne<Konva.Text>(".personal-best")!.text();
+    }
+
+    it("shows the Player's Personal Best and Rank on each tab", async () => {
+      const store = new MemoryLeaderboardStore({ playerId: "me" });
+      store.seed({ playerId: "ana", playerName: "Ana", difficulty: Difficulty.Hard, score: 2000, timeSpentMs: 1 });
+      store.seed({ playerId: "me", playerName: "Me", difficulty: Difficulty.Hard, score: 1200, timeSpentMs: 192_000 });
+      const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+      click(screen, "trophy-button");
+      await flush();
+      expect(personalBest(screen)).toBe("No saved runs yet");
+
+      click(screen, "leaderboard-tab-hard");
+      expect(personalBest(screen)).toBe("");
+      await flush();
+      expect(personalBest(screen)).toBe(`Your best: #2 · 1,200 · ${formatTime(192_000)}`);
+    });
+
+    it("is blank when the Personal Best can't load", async () => {
+      const store = new MemoryLeaderboardStore({ playerId: "me" });
+      store.failNext("fetchBest");
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+      click(screen, "trophy-button");
+      await flush();
+
+      expect(personalBest(screen)).toBe("");
+      errorSpy.mockRestore();
+    });
+  });
+
+  it("drops a board that finishes loading after the modal closed", async () => {
+    const store = new MemoryLeaderboardStore({ playerId: "p" });
+    store.seed({ playerId: "p", playerName: "Late", difficulty: Difficulty.Easy, score: 1, timeSpentMs: 1 });
+    const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+    click(screen, "trophy-button");
+    click(screen, "close-leaderboard");
+    await flush();
+
+    expect(screen.layer.find(".leaderboard-row")).toHaveLength(0);
+    expect(screen.layer.findOne<Konva.Text>(".board-status")!.text()).toBe("Loading…");
   });
 
   it("show() and hide() toggle its layer and reset both the difficulty sub-menu and modal", () => {

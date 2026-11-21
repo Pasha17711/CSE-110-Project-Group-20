@@ -1,5 +1,5 @@
 import Konva from "konva";
-import { Difficulty, DIFFICULTY_LABEL, Leaderboard, formatTime, type LeaderboardEntry } from "../score";
+import { Difficulty, DIFFICULTY_LABEL, LEADERBOARD_SIZE, Leaderboard, formatTime, type LoadResult, type PersonalBestResult } from "../score";
 import type { StartScreen as StartScreenContract, Unsubscribe } from "./contracts";
 import { DESIGN_HEIGHT, DESIGN_WIDTH, fitLayer } from "./layout";
 import { Listeners } from "./listeners";
@@ -9,6 +9,10 @@ const DIFFICULTIES = [Difficulty.Easy, Difficulty.Medium, Difficulty.Hard] as co
 
 const MENU_BTN = { width: 320, height: 64, gap: 40 };
 const VAULT = { x: 350, y: 235, width: 740, height: 590 };
+const BOARD_MODAL = { width: 720, height: 620 };
+const BOARD_ROWS = { y: 300, rowHeight: 34 };
+/** Behind the current Player's rows. */
+const MINE_FILL = "rgba(255, 212, 71, 0.45)";
 const DIFFICULTY_COLORS: Record<Difficulty, string> = {
   [Difficulty.Easy]: "#7cfc30",
   [Difficulty.Medium]: "#ffd447",
@@ -32,10 +36,21 @@ export class StartScreen implements StartScreenContract {
   private readonly leaderboard?: Leaderboard;
   private readonly leaderboardModal = new Konva.Group({ visible: false });
   private selectedBoardDifficulty: Difficulty = Difficulty.Easy;
+  /** Bumped by each board load and when the modal closes, so late results are dropped. */
+  private boardRequest = 0;
 
   private readonly mainMenuGroup = new Konva.Group();
   private readonly difficultyGroup = new Konva.Group({ visible: false });
   private readonly boardRowsGroup = new Konva.Group();
+  private readonly personalBestText = createText({
+    x: (DESIGN_WIDTH - BOARD_MODAL.width) / 2,
+    y: BOARD_ROWS.y + LEADERBOARD_SIZE * BOARD_ROWS.rowHeight + 2,
+    width: BOARD_MODAL.width,
+    align: "center",
+    fontSize: 20,
+    fill: COLORS.purple,
+    name: "personal-best",
+  });
   private readonly boardTabs = new Map<Difficulty, Konva.Group>();
 
   constructor(stageWidth: number, stageHeight: number, leaderboard?: Leaderboard) {
@@ -369,8 +384,8 @@ export class StartScreen implements StartScreenContract {
     this.leaderboardModal.add(backdrop);
 
     // Modal card
-    const modalW = 720;
-    const modalH = 620;
+    const modalW = BOARD_MODAL.width;
+    const modalH = BOARD_MODAL.height;
     const mx = (DESIGN_WIDTH - modalW) / 2;
     const my = (DESIGN_HEIGHT - modalH) / 2;
 
@@ -423,7 +438,7 @@ export class StartScreen implements StartScreenContract {
 
     this.updateLeaderboardTabStyles();
 
-    this.leaderboardModal.add(this.boardRowsGroup);
+    this.leaderboardModal.add(this.boardRowsGroup, this.personalBestText);
 
     // Close button
     this.leaderboardModal.add(this.createStyledMenuButton({
@@ -435,6 +450,7 @@ export class StartScreen implements StartScreenContract {
       fill: "#ffffff",
       name: "close-leaderboard",
       onClick: () => {
+        this.boardRequest++;
         this.leaderboardModal.hide();
         this.layer.batchDraw();
       },
@@ -451,65 +467,78 @@ export class StartScreen implements StartScreenContract {
   }
 
   /**
-   * Loads one Difficulty's Leaderboard, then draws it. A load that finishes
-   * after the player picked another tab is ignored. A failed load shows the
-   * empty-board text for now (loading and error states come in stage 4).
+   * Shows "Loading…", then loads one Difficulty's Leaderboard and the
+   * Player's Personal Best there. Results that arrive after the player picked
+   * another tab or closed the modal are dropped.
    */
   private renderLeaderboardRows(difficulty: Difficulty): void {
-    this.boardRowsGroup.destroyChildren();
     if (!this.leaderboard) return;
+    const request = ++this.boardRequest;
+    this.drawBoardMessage("Loading…");
+    this.personalBestText.text("");
 
     void this.leaderboard.getEntries(difficulty).then((result) => {
-      if (this.selectedBoardDifficulty !== difficulty) return;
-      this.drawLeaderboardRows(difficulty, result.status === "loaded" ? result.entries : []);
+      if (request !== this.boardRequest) return;
+      this.drawLeaderboardRows(difficulty, result);
+      this.layer.batchDraw();
+    });
+    void this.leaderboard.getPersonalBest(difficulty).then((result) => {
+      if (request !== this.boardRequest) return;
+      this.personalBestText.text(personalBestLine(result));
       this.layer.batchDraw();
     });
   }
 
-  private drawLeaderboardRows(difficulty: Difficulty, entries: LeaderboardEntry[]): void {
-    this.boardRowsGroup.destroyChildren();
-
-    const modalW = 720;
-    const mx = (DESIGN_WIDTH - modalW) / 2;
-    const startY = 300;
-
-    if (entries.length === 0) {
-      this.boardRowsGroup.add(createText({
-        x: mx,
-        y: startY + 110,
-        width: modalW,
-        text: `No ${DIFFICULTY_LABEL[difficulty]} scores recorded yet.\nComplete a heist to claim #1!`,
-        align: "center",
-        fontSize: 24,
-        fill: "#555566",
-      }));
+  private drawLeaderboardRows(difficulty: Difficulty, result: LoadResult): void {
+    if (result.status === "loadFailed") {
+      this.drawBoardMessage("Couldn't load the leaderboard.\nCheck your connection and try again.");
+      return;
+    }
+    if (result.entries.length === 0) {
+      this.drawBoardMessage(`No ${DIFFICULTY_LABEL[difficulty]} scores recorded yet.\nComplete a heist to claim #1!`);
       return;
     }
 
-    entries.slice(0, 10).forEach((entry, i) => {
-      const rowY = startY + i * 36;
-      const formattedTime = formatTime(entry.timeSpentMs);
-      
-      this.boardRowsGroup.add(createText({
+    this.boardRowsGroup.destroyChildren();
+    const mx = (DESIGN_WIDTH - BOARD_MODAL.width) / 2;
+    result.entries.slice(0, LEADERBOARD_SIZE).forEach((entry, i) => {
+      const row = new Konva.Group({ y: BOARD_ROWS.y + i * BOARD_ROWS.rowHeight, name: "leaderboard-row", listening: false });
+      if (entry.isMine) {
+        row.add(new Konva.Rect({ x: mx + 40, y: -5, width: BOARD_MODAL.width - 80, height: BOARD_ROWS.rowHeight - 2, cornerRadius: 8, fill: MINE_FILL, name: "mine-highlight" }));
+      }
+      row.add(createText({
         x: mx + 56,
-        y: rowY,
         width: 340,
         text: `#${i + 1}  ${entry.playerName}`,
         align: "left",
         fontSize: 22,
         fill: COLORS.purple,
       }));
-
-      this.boardRowsGroup.add(createText({
+      row.add(createText({
         x: mx + 400,
-        y: rowY,
         width: 260,
         text: `${entry.score.toLocaleString("en-US")}  (${formatTime(entry.timeSpentMs)})`,
         align: "right",
         fontSize: 22,
         fill: COLORS.purple,
       }));
+      this.boardRowsGroup.add(row);
     });
+  }
+
+  /** One centered message in place of the rows: loading, failed, or empty. */
+  private drawBoardMessage(text: string): void {
+    this.boardRowsGroup.destroyChildren();
+    this.boardRowsGroup.add(createText({
+      x: (DESIGN_WIDTH - BOARD_MODAL.width) / 2,
+      y: BOARD_ROWS.y + 110,
+      width: BOARD_MODAL.width,
+      text,
+      align: "center",
+      fontSize: 24,
+      fill: "#555566",
+      name: "board-status",
+    }));
   }
 
   /** A lightweight Settings screen using the same colors and positions as Figma 50:2. */
@@ -589,6 +618,7 @@ export class StartScreen implements StartScreenContract {
 
   show(): void {
     // Reset to primary menu whenever returning to StartScreen
+    this.boardRequest++;
     this.leaderboardModal.hide();
     this.audioSettings.hide();
     this.difficultyGroup.hide();
@@ -600,4 +630,12 @@ export class StartScreen implements StartScreenContract {
   hide(): void {
     this.layer.hide();
   }
+}
+
+/** The line under the board: the Player's Personal Best and Rank, or nothing if it couldn't load. */
+function personalBestLine(result: PersonalBestResult): string {
+  if (result.status === "loadFailed") return "";
+  if (!result.best) return "No saved runs yet";
+  const { entry, rank } = result.best;
+  return `Your best: #${rank} · ${entry.score.toLocaleString("en-US")} · ${formatTime(entry.timeSpentMs)}`;
 }
