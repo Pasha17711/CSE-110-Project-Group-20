@@ -2,21 +2,18 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("konva", () => import("./testing/fakeKonva"));
 
+import type Konva from "konva";
 import { StartScreen } from "./StartScreen";
-import { Difficulty, Leaderboard, formatTime, type StorageLike } from "../score";
+import { Difficulty, Leaderboard, MemoryLeaderboardStore, formatTime } from "../score";
 import { visibleTexts } from "./testing/fakeKonva";
 
 function click(screen: StartScreen, name: string): void {
   screen.layer.findOne(`.${name}`)!.fire("click");
 }
 
-function memoryStorage(): StorageLike {
-  const data = new Map<string, string>();
-  return {
-    getItem: (k) => data.get(k) ?? null,
-    setItem: (k, v) => { data.set(k, v); },
-    removeItem: (k) => { data.delete(k); },
-  };
+/** Lets the leaderboard's pending loads finish. */
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe("StartScreen", () => {
@@ -94,15 +91,17 @@ describe("StartScreen", () => {
     expect(onCredits).toHaveBeenCalledOnce();
   });
 
-  it("opens the High Scores modal on trophy click, switches difficulty tabs, and closes cleanly", () => {
-    const board = new Leaderboard(memoryStorage());
-    board.addEntry({
+  it("opens the High Scores modal on trophy click, switches difficulty tabs, and closes cleanly", async () => {
+    const store = new MemoryLeaderboardStore({ playerId: "alice" });
+    const board = new Leaderboard(store);
+    await board.addEntry({
       playerName: "Alice",
       difficulty: Difficulty.Easy,
       score: 14000,
       timeSpentMs: 95_000,
     });
-    board.addEntry({
+    store.setPlayer("bob");
+    await board.addEntry({
       playerName: "Bob",
       difficulty: Difficulty.Hard,
       score: 21500,
@@ -116,18 +115,21 @@ describe("StartScreen", () => {
 
     // Open modal -> defaults to Easy tab
     click(screen, "trophy-button");
+    await flush();
     expect(visibleTexts(screen.layer)).toEqual(
       expect.arrayContaining(["🏆 HIGH SCORES", "#1  Alice", `14,000  (${formatTime(95_000)})`]),
     );
 
     // Switch to Medium tab (empty state)
     click(screen, "leaderboard-tab-medium");
+    await flush();
     expect(visibleTexts(screen.layer)).toContain(
       "No Medium scores recorded yet.\nComplete a heist to claim #1!",
     );
 
     // Switch to Hard tab
     click(screen, "leaderboard-tab-hard");
+    await flush();
     expect(visibleTexts(screen.layer)).toEqual(
       expect.arrayContaining(["#1  Bob", `21,500  (${formatTime(185_000)})`]),
     );
@@ -137,8 +139,115 @@ describe("StartScreen", () => {
     expect(visibleTexts(screen.layer)).not.toContain("🏆 HIGH SCORES");
   });
 
+  it("ignores a board that finishes loading after another tab was picked", async () => {
+    const store = new MemoryLeaderboardStore({ playerId: "p" });
+    store.seed({ playerId: "p", playerName: "EasyPlayer", difficulty: Difficulty.Easy, score: 1, timeSpentMs: 1 });
+    // Hold the Easy load until after the Medium one has finished.
+    let releaseEasy!: () => void;
+    const easyGate = new Promise<void>((resolve) => { releaseEasy = resolve; });
+    const fetchTop = store.fetchTop.bind(store);
+    store.fetchTop = async (difficulty, limit) => {
+      if (difficulty === Difficulty.Easy) await easyGate;
+      return fetchTop(difficulty, limit);
+    };
+    const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+    click(screen, "trophy-button");
+    click(screen, "leaderboard-tab-medium");
+    await flush();
+    releaseEasy();
+    await flush();
+
+    expect(visibleTexts(screen.layer)).not.toContain("#1  EasyPlayer");
+    expect(visibleTexts(screen.layer)).toContain("No Medium scores recorded yet.\nComplete a heist to claim #1!");
+  });
+
+  it("says so when the leaderboard can't load", async () => {
+    const store = new MemoryLeaderboardStore({ playerId: "p" });
+    store.failNext("fetchTop");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+    click(screen, "trophy-button");
+    await flush();
+
+    expect(visibleTexts(screen.layer)).toContain("Couldn't load the leaderboard.\nCheck your connection and try again.");
+    errorSpy.mockRestore();
+  });
+
+  it("shows Loading… until the board arrives", async () => {
+    const screen = new StartScreen(1440, 900, new Leaderboard(new MemoryLeaderboardStore({ playerId: "p" })));
+
+    click(screen, "trophy-button");
+    expect(visibleTexts(screen.layer)).toContain("Loading…");
+
+    await flush();
+    expect(visibleTexts(screen.layer)).not.toContain("Loading…");
+  });
+
+  it("highlights the current Player's rows", async () => {
+    const store = new MemoryLeaderboardStore({ playerId: "me" });
+    store.seed({ playerId: "ana", playerName: "Ana", difficulty: Difficulty.Easy, score: 900, timeSpentMs: 1 });
+    store.seed({ playerId: "me", playerName: "Me", difficulty: Difficulty.Easy, score: 800, timeSpentMs: 1 });
+    const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+    click(screen, "trophy-button");
+    await flush();
+
+    const rows = screen.layer.find(".leaderboard-row");
+    expect(rows.map((row) => (row as Konva.Group).findOne(".mine-highlight") !== undefined)).toEqual([false, true]);
+  });
+
+  describe("Personal Best line", () => {
+    function personalBest(screen: StartScreen): string {
+      return screen.layer.findOne<Konva.Text>(".personal-best")!.text();
+    }
+
+    it("shows the Player's Personal Best and Rank on each tab", async () => {
+      const store = new MemoryLeaderboardStore({ playerId: "me" });
+      store.seed({ playerId: "ana", playerName: "Ana", difficulty: Difficulty.Hard, score: 2000, timeSpentMs: 1 });
+      store.seed({ playerId: "me", playerName: "Me", difficulty: Difficulty.Hard, score: 1200, timeSpentMs: 192_000 });
+      const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+      click(screen, "trophy-button");
+      await flush();
+      expect(personalBest(screen)).toBe("No saved runs yet");
+
+      click(screen, "leaderboard-tab-hard");
+      expect(personalBest(screen)).toBe("");
+      await flush();
+      expect(personalBest(screen)).toBe(`Your best: #2 · 1,200 · ${formatTime(192_000)}`);
+    });
+
+    it("is blank when the Personal Best can't load", async () => {
+      const store = new MemoryLeaderboardStore({ playerId: "me" });
+      store.failNext("fetchBest");
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+      click(screen, "trophy-button");
+      await flush();
+
+      expect(personalBest(screen)).toBe("");
+      errorSpy.mockRestore();
+    });
+  });
+
+  it("drops a board that finishes loading after the modal closed", async () => {
+    const store = new MemoryLeaderboardStore({ playerId: "p" });
+    store.seed({ playerId: "p", playerName: "Late", difficulty: Difficulty.Easy, score: 1, timeSpentMs: 1 });
+    const screen = new StartScreen(1440, 900, new Leaderboard(store));
+
+    click(screen, "trophy-button");
+    click(screen, "close-leaderboard");
+    await flush();
+
+    expect(screen.layer.find(".leaderboard-row")).toHaveLength(0);
+    expect(screen.layer.findOne<Konva.Text>(".board-status")!.text()).toBe("Loading…");
+  });
+
   it("show() and hide() toggle its layer and reset both the difficulty sub-menu and modal", () => {
-    const board = new Leaderboard(memoryStorage());
+    const board = new Leaderboard(new MemoryLeaderboardStore({ playerId: "p" }));
     const screen = new StartScreen(1440, 900, board);
 
     click(screen, "trophy-button");

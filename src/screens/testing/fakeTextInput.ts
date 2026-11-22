@@ -35,6 +35,10 @@ export class FakeTextInput extends FakeGroup {
     return this.value;
   }
 
+  setText(text: string): void {
+    this.value = text;
+  }
+
   clear(): void {
     this.value = "";
   }
@@ -42,13 +46,18 @@ export class FakeTextInput extends FakeGroup {
   outlineColor(): void {}
   backgroundColor(): void {}
   textColor(): void {}
-  enable(): void {}
-  disable(): void {}
+  enabled = true;
+  enable(): void {
+    this.enabled = true;
+  }
+  disable(): void {
+    this.enabled = false;
+  }
 
-  /** Types `text` and presses Enter. */
+  /** Types `text` and presses Enter. Like the real one, a disabled input doesn't submit. */
   enter(text: string): void {
     this.value = text;
-    this.onTextEntered?.(text);
+    if (this.enabled) this.onTextEntered?.(text);
   }
 }
 
