@@ -258,7 +258,7 @@ class MultistepSolverModel {
     if (previousOp !== '*' && previousOp !== '/') {
       const expression = this.expressionTerms(side)
         .find(candidate => index >= candidate.start && index <= candidate.end);
-      if (expression?.variable !== null) {
+      if (expression && expression.variable !== null) {
         // Use the sign of the complete term: it may come from the variable
         // (`-x / 2`) or from a coefficient (`-2 * x`, `x * -2`).
         const coefficientSign = expression.coefficient.numerator < 0 ? -1 : 1;
@@ -409,14 +409,16 @@ class MultistepSolverModel {
         if (expression.start + 2 === expression.end &&
           side[expression.start + 1] === '/' &&
           typeof side[expression.start + 2] !== 'string') {
-          const divisor = this.parseFraction(side[expression.start + 2].term)
+          const divisorTerm = side[expression.start + 2]
+          if (typeof divisorTerm === 'string') throw Error('Expected a divisor term.')
+          const divisor = this.parseFraction(divisorTerm.term)
           if (Math.abs(divisor.numerator) === 1 && divisor.denominator !== 1) {
             display.push({ term: side[expression.start], modelIndex: expression.start })
             display.push({ term: '*', modelIndex: expression.start + 1 })
             display.push({
               term: {
                 term: `${divisor.denominator}`,
-                positive: side[expression.start + 2].positive === (divisor.numerator > 0),
+                positive: divisorTerm.positive === (divisor.numerator > 0),
                 constant: true,
               },
               modelIndex: expression.start + 2,
@@ -449,8 +451,9 @@ class MultistepSolverModel {
           isCoefficient: true,
         })
       } else {
-        const coefficientIndex = typeof side[expression.start] !== 'string' &&
-          !side[expression.start].constant ? expression.end : expression.start
+        const firstTerm = side[expression.start]
+        const coefficientIndex = typeof firstTerm !== 'string' &&
+          !firstTerm.constant ? expression.end : expression.start
         display.push({
           term: {
             term: this.fractionText(coefficient),
