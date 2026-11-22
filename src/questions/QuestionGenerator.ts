@@ -6,10 +6,11 @@ const MAX_FACTOR: number = 10; // factors can range from 2 to MAX_FACTOR
 
 // probabilities of easy, medium, hard questions being generated, respectively,
 // at different game difficulties
-export const DIFFICULTY_WEIGHTS: Record<Difficulty, readonly [number, number, number]> = {
-  [Difficulty.Easy]: [0.6, 0.3, 0.1],
-  [Difficulty.Medium]: [0.2, 0.6, 0.2],
-  [Difficulty.Hard]: [0.05, 0.2, 0.75]
+// "Hard difficulty" is given as 1 - easy difficulty - medium difficulty
+export const DIFFICULTY_WEIGHTS: Record<Difficulty, readonly [number, number]> = {
+  [Difficulty.Easy]: [0.6, 0.3],
+  [Difficulty.Medium]: [0.2, 0.6],
+  [Difficulty.Hard]: [0.05, 0.2]
 };
 
 /**
@@ -206,8 +207,13 @@ export function getQuestionOfDifficulty(difficulty: Difficulty): Question {
   return { prompt: formatPrompt(parts, difficulty), answer: String(parts.answerValue) };
 }
 
-// randomly picks a difficulty based on the given weights [easy, medium, hard]
-export function pickDifficulty(weights: readonly [number, number, number]): Difficulty {
+// randomly picks a difficulty based on the given weights [easy, medium]
+// hard is assumed to be 1 - easy - medium
+export function pickDifficulty(weights: readonly [number, number]): Difficulty {
+  if (weights[0] + weights[1] > 1) {
+    throw new RangeError(`difficulty weights must sum to at most 1, got [${weights[0]}, ${weights[1]}]`);
+  }
+
   const mediumThreshold = weights[0];
   const hardThreshold = mediumThreshold + weights[1]; 
   const roll: number = Math.random();
@@ -216,9 +222,10 @@ export function pickDifficulty(weights: readonly [number, number, number]): Diff
     return Difficulty.Hard;
   } else if (roll > mediumThreshold) {
     return Difficulty.Medium;
-  } else {
-    return Difficulty.Easy;
   }
+
+  return Difficulty.Easy;
+
 }
 
 /**
