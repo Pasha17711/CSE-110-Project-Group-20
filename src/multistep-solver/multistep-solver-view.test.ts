@@ -173,7 +173,7 @@ describe('MultistepSolverView', () => {
     expect(layer.children).toContain(internal.view)
   })
 
-  it('updates reused blocks into a green draggable negative-sign palette block', () => {
+  it('renders a negative coefficient before its variable', () => {
     const { view } = setup()
     const model = new MultistepSolverModel()
     model.addLeft(variableTerm('x', true))
@@ -186,8 +186,9 @@ describe('MultistepSolverView', () => {
     view.update(model)
 
     const negativeBlock = (view as any).leftSide[0]
-    expect(negativeBlock.getAttr('negativeSign')).toBe(true)
+    expect(negativeBlock.getAttr('negativeSign')).not.toBe(true)
     expect(negativeBlock.getAttr('paletteBlock')).toBe(true)
+    expect(negativeBlock.findOne('.text').text()).toBe('-5')
     expect(negativeBlock.findOne('.background').fill()).toBe('#4ade80')
     expect(negativeBlock.listeners['mousedown.palette touchstart.palette']).toHaveLength(1)
   })
@@ -222,6 +223,6 @@ describe('MultistepSolverView', () => {
     view.update(model)
 
     const internal = view as any
-    expect(internal.leftSide[4].findOne('.text').text()).toBe('(-3)')
+    expect(internal.leftSide[0].findOne('.text').text()).toBe('-15')
   })
 })
