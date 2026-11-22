@@ -108,13 +108,12 @@ function classifyPrompt(prompt: string): Difficulty {
 }
 
 describe('DIFFICULTY_WEIGHTS', () => {
-  it.each(DIFFICULTIES)('has non-negative weights that add up to 1 (%s)', (_name, difficulty) => {
-    const weights = DIFFICULTY_WEIGHTS[difficulty];
+  it.each(DIFFICULTIES)('has non-negative weights that add up to at most 1 (%s)', (_name, difficulty) => {
+    const [easy, medium] = DIFFICULTY_WEIGHTS[difficulty];
 
-    for (const weight of weights) {
-      expect(weight).toBeGreaterThanOrEqual(0);
-    }
-    expect(weights[0] + weights[1] + weights[2]).toBeCloseTo(1);
+    expect(easy).toBeGreaterThanOrEqual(0);
+    expect(medium).toBeGreaterThanOrEqual(0);
+    expect(easy + medium).toBeLessThanOrEqual(1);
   });
 });
 
@@ -123,13 +122,13 @@ describe('pickDifficulty', () => {
     vi.restoreAllMocks();
   });
 
-  function pickWithRoll(weights: readonly [number, number, number], roll: number): Difficulty {
+  function pickWithRoll(weights: readonly [number, number], roll: number): Difficulty {
     vi.spyOn(Math, 'random').mockReturnValue(roll);
     return pickDifficulty(weights);
   }
 
   it('picks Easy, Medium or Hard depending on which weight band the roll lands in', () => {
-    const weights = [0.2, 0.6, 0.2] as const;
+    const weights = [0.2, 0.6] as const; // hard = 0.2
 
     expect(pickWithRoll(weights, 0)).toBe(Difficulty.Easy);
     expect(pickWithRoll(weights, 0.1)).toBe(Difficulty.Easy);
@@ -139,17 +138,29 @@ describe('pickDifficulty', () => {
   });
 
   it('never picks a difficulty with a weight of 0', () => {
-    expect(pickWithRoll([1, 0, 0], 0.999)).toBe(Difficulty.Easy);
-    expect(pickWithRoll([0, 1, 0], 0.999)).toBe(Difficulty.Medium);
-    expect(pickWithRoll([0, 0, 1], 0.001)).toBe(Difficulty.Hard);
+    expect(pickWithRoll([1, 0], 0.999)).toBe(Difficulty.Easy);
+    expect(pickWithRoll([0, 1], 0.999)).toBe(Difficulty.Medium);
+    expect(pickWithRoll([0, 0], 0.001)).toBe(Difficulty.Hard);
+  });
+
+  it('accepts weights that add up to exactly 1', () => {
+    expect(() => pickWithRoll([0.5, 0.5], 0.5)).not.toThrow();
+  });
+
+  it('throws a RangeError when the weights add up to more than 1', () => {
+    expect(() => pickWithRoll([0.6, 0.5], 0.5)).toThrow(RangeError);
+    expect(() => pickWithRoll([1.1, 0], 0.5)).toThrow(RangeError);
+    expect(() => pickWithRoll([0, 1.1], 0.5)).toThrow(RangeError);
   });
 
   it.each(DIFFICULTIES)('picks each difficulty for the middle of its band in DIFFICULTY_WEIGHTS (%s)', (_name, difficulty) => {
-    const [easy, medium, hard] = DIFFICULTY_WEIGHTS[difficulty];
+    const weights = DIFFICULTY_WEIGHTS[difficulty];
+    const [easy, medium] = weights;
+    const hard = 1 - easy - medium;
 
-    expect(pickWithRoll(DIFFICULTY_WEIGHTS[difficulty], easy / 2)).toBe(Difficulty.Easy);
-    expect(pickWithRoll(DIFFICULTY_WEIGHTS[difficulty], easy + medium / 2)).toBe(Difficulty.Medium);
-    expect(pickWithRoll(DIFFICULTY_WEIGHTS[difficulty], easy + medium + hard / 2)).toBe(Difficulty.Hard);
+    expect(pickWithRoll(weights, easy / 2)).toBe(Difficulty.Easy);
+    expect(pickWithRoll(weights, easy + medium / 2)).toBe(Difficulty.Medium);
+    expect(pickWithRoll(weights, easy + medium + hard / 2)).toBe(Difficulty.Hard);
   });
 });
 
