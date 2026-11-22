@@ -210,8 +210,8 @@ export function getQuestionOfDifficulty(difficulty: Difficulty): Question {
 // randomly picks a difficulty based on the given weights [easy, medium]
 // hard is assumed to be 1 - easy - medium
 export function pickDifficulty(weights: readonly [number, number]): Difficulty {
-  if (weights[0] + weights[1] > 1) {
-    throw new RangeError(`difficulty weights must sum to at most 1, got [${weights[0]}, ${weights[1]}]`);
+  if (weights[0] + weights[1] > 1 || weights[0] < 0 || weights[1] < 0) {
+    throw new RangeError(`difficulty weights must sum to at most 1 and be nonnegative, got [${weights[0]}, ${weights[1]}]`);
   }
 
   const mediumThreshold = weights[0];
