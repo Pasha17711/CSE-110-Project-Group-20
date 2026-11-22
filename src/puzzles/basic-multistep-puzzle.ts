@@ -1,7 +1,7 @@
 import Konva from 'konva'
 
 import ActionMenu from '../multistep-solver/action-menu'
-import { equivalentArithmeticExpressions } from '../multistep-solver/arithmetic-expression'
+import { acceptableArithmeticAnswer } from '../multistep-solver/arithmetic-expression'
 import MultistepSolverController from '../multistep-solver/multistep-solver-controller'
 import MultistepSolverModel from '../multistep-solver/multistep-solver-model'
 import MultistepSolverView from '../multistep-solver/multistep-solver-view'
@@ -191,7 +191,10 @@ class BasicMultistepPuzzle implements Puzzle {
       this.keypadAnswer = ''
       this.keypad.setAnswer()
 
-      if (playerAnswer === correctAnswer || equivalentArithmeticExpressions(playerAnswer, correctAnswer)) {
+      const accepted = stepPrompt === undefined
+        ? playerAnswer === correctAnswer
+        : acceptableArithmeticAnswer(playerAnswer, stepPrompt, correctAnswer)
+      if (accepted) {
         this.controller.step()
       }
 
