@@ -3,7 +3,7 @@ import type { NotificationManager } from "../notification-manager/NotificationMa
 import { EventType } from "../notification-manager/GameEvent";
 import { solvesRoom, type Question, type StepAnswer } from "../questions/Question";
 import type { RoomKind } from "../map/Room";
-import { equivalentArithmeticExpressions } from "../multistep-solver/arithmetic-expression";
+import { acceptableArithmeticAnswer, equivalentArithmeticExpressions } from "../multistep-solver/arithmetic-expression";
 
 /**
  * Judges each Step's Answer, sends the events for it and records the Answer
@@ -27,8 +27,13 @@ export class AnswerValidator {
      */
     validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind,
         roomId: string, stepNumber?: number): boolean {
-        const isCorrect = answer.playerAnswer.trim() === answer.correctAnswer.trim() ||
-            equivalentArithmeticExpressions(answer.playerAnswer, answer.correctAnswer);
+        // Multistep arithmetic answers carry the expression being simplified
+        // in stepPrompt. Use the strict solver evaluator there so a copied
+        // prompt cannot be recorded as correct.
+        const isCorrect = answer.stepPrompt !== undefined
+            ? acceptableArithmeticAnswer(answer.playerAnswer, answer.stepPrompt, answer.correctAnswer)
+            : answer.playerAnswer.trim() === answer.correctAnswer.trim() ||
+              equivalentArithmeticExpressions(answer.playerAnswer, answer.correctAnswer);
 
         if (isCorrect && solvesRoom(answer)) {
             this.notifications.send({ eventType: EventType.RoomSolved, roomKind: kind, roomId });

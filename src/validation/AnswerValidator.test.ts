@@ -103,6 +103,21 @@ describe("AnswerValidator", () => {
         expect(types()).toEqual([EventType.RoomSolved, EventType.Correct]);
     });
 
+    it.each(["10 + 2", "-4/2", "4/-2"])("rejects an unsimplified multistep answer: %s", playerAnswer => {
+        const result = validator.validateAnswer(
+            question,
+            {
+                ...step(playerAnswer, playerAnswer === "10 + 2" ? "12" : "-2", true),
+                stepPrompt: playerAnswer,
+            },
+            "main",
+            "room_a",
+        );
+
+        expect(result).toBe(false);
+        expect(types()).toEqual([EventType.Incorrect]);
+    });
+
     it("records every Answer as an AnswerRecord", () => {
         validator.validateAnswer(question, step("+", "-", false), "main", "room_a");
         validator.validateAnswer(question, step("-", "-", false), "main", "room_a");
