@@ -1,12 +1,14 @@
 import { Term, TermOp, TermValue } from './types'
 import MultistepSolverModel from './multistep-solver-model'
 import MultistepSolverView from './multistep-solver-view'
+import { equivalentArithmeticExpressions } from './arithmetic-expression'
 
 export type MultistepSolverState = 'Idle' | 'Operation' | 'Arithmetic' | 'Finished'
 
 interface PendingOperation {
   kind: 'term' | 'negativeSign'
   index?: number
+  isCoefficient?: boolean
   isLeftSide: boolean
   accepted: boolean
 }
@@ -83,13 +85,13 @@ class MultistepSolverController {
   }
 
   /** Records a dropped term and enters operation mode. @param index Term index. @param isLeftSide Whether the term is on the left. */
-  public operation(index: number, isLeftSide: boolean): void {
+  public operation(index: number, isLeftSide: boolean, isCoefficient = false): void {
     if (this.state === 'Arithmetic' || this.state === 'Finished') return
 
     const side = isLeftSide ? this.model.getLeftSide() : this.model.getRightSide()
     if (index < 0 || index >= side.length || typeof side[index] === 'string') return
 
-    this.pendingOperation = { kind: 'term', index, isLeftSide, accepted: false }
+    this.pendingOperation = { kind: 'term', index, isLeftSide, isCoefficient, accepted: false }
     this.setState('Operation')
   }
 
@@ -110,14 +112,15 @@ class MultistepSolverController {
       : this.model.correctOperation(
         this.pendingOperation.index!,
         this.pendingOperation.isLeftSide,
+        this.pendingOperation.isCoefficient,
       )
     const isCorrect = operation === expectedOperation
     this.pendingOperation.accepted = isCorrect
     const pending = this.pendingOperation
     const isLastStep = this.wouldFinish(scratch => {
       if (pending.kind === 'negativeSign') scratch.removeNegativeSign(pending.isLeftSide)
-      else if (pending.isLeftSide) scratch.moveLeftTerm(pending.index!)
-      else scratch.moveRightTerm(pending.index!)
+      else if (pending.isLeftSide) scratch.moveLeftTerm(pending.index!, pending.isCoefficient)
+      else scratch.moveRightTerm(pending.index!, pending.isCoefficient)
     })
     this.onAnswerSubmit?.(this.equation, operation, expectedOperation, isLastStep)
   }
@@ -134,7 +137,7 @@ class MultistepSolverController {
 
     const [stepPrompt, correctAnswer] = problems[0]
     const isLastStep = this.isLastArithmeticStep()
-    this.arithmeticAnswerAccepted = answer === correctAnswer
+    this.arithmeticAnswerAccepted = equivalentArithmeticExpressions(answer, correctAnswer)
     this.onAnswerSubmit?.(this.equation, answer, correctAnswer, isLastStep,
       stepPrompt)
   }
@@ -149,9 +152,9 @@ class MultistepSolverController {
       if (this.pendingOperation.kind === 'negativeSign') {
         this.model.removeNegativeSign(this.pendingOperation.isLeftSide)
       } else if (this.pendingOperation.isLeftSide) {
-        this.model.moveLeftTerm(this.pendingOperation.index!)
+        this.model.moveLeftTerm(this.pendingOperation.index!, this.pendingOperation.isCoefficient)
       } else {
-        this.model.moveRightTerm(this.pendingOperation.index!)
+        this.model.moveRightTerm(this.pendingOperation.index!, this.pendingOperation.isCoefficient)
       }
 
       this.pendingOperation = null

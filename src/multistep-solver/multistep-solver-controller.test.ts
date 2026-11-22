@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import MultistepSolverController from './multistep-solver-controller'
 import MultistepSolverModel from './multistep-solver-model'
-import { Term } from './types'
+import { Term, variableTerm } from './types'
 
 const numberTerm = (term: string, positive = true): Term => ({
   term,
@@ -92,6 +92,95 @@ describe('MultistepSolverController', () => {
     controller.setEquation('-x = -5')
 
     expect(controller.getState()).not.toBe('Finished')
+  })
+
+  it('adds a negative divided variable term when it is moved across the equation', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    const submissions: Array<[string, string]> = []
+    controller.onAnswerSubmit = (_question, answer, correct) => {
+      submissions.push([answer as string, correct as string])
+    }
+
+    controller.setEquation('-x / 5 = 10')
+    expect(model.getLeftSide()).toEqual([
+      variableTerm('x', false), '/', numberTerm('5'),
+    ])
+    controller.operation(0, true)
+    controller.moveRequest('+')
+
+    expect(submissions.at(-1)).toEqual(['+', '+'])
+    controller.step()
+    expect(model.getRightSide()).toEqual([
+      numberTerm('10'),
+      variableTerm('x', true), '/', numberTerm('5'),
+    ])
+  })
+
+  it('keeps the variable sign and uses the whole negative product for -2 * x', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    const submissions: Array<[string, string]> = []
+    controller.onAnswerSubmit = (_question, answer, correct) => {
+      submissions.push([answer as string, correct as string])
+    }
+
+    controller.setEquation('-2 * x = 10')
+
+    expect(model.getLeftSide()).toEqual([
+      numberTerm('2', false), '*', variableTerm('x', true),
+    ])
+    expect(model.getDisplaySide(true).map(({ modelIndex, term }) => ({ modelIndex, term }))).toEqual([
+      { modelIndex: 0, term: numberTerm('2', false) },
+      { modelIndex: 0, term: '*'},
+      { modelIndex: 0, term: variableTerm('x', true) },
+    ])
+
+    controller.operation(0, true)
+    controller.moveRequest('+')
+    expect(submissions.at(-1)).toEqual(['+', '+'])
+  })
+
+  it('uses multiplication when dragging a divisor coefficient', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    const submissions: Array<[string, string]> = []
+    controller.onAnswerSubmit = (_question, answer, correct) => {
+      submissions.push([answer as string, correct as string])
+    }
+
+    controller.setEquation('x / 2 = 10')
+    controller.operation(2, true, true)
+    controller.moveRequest('*')
+    expect(submissions.at(-1)).toEqual(['*', '*'])
+    controller.step()
+
+    expect(model.getLeftSide()).toEqual([
+      variableTerm('x', true),
+    ])
+    expect(model.getRightSide()).toEqual([
+      numberTerm('10'), '*', numberTerm('2'),
+    ])
+  })
+
+  it('uses division when dragging a leading coefficient', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    const submissions: Array<[string, string]> = []
+    controller.onAnswerSubmit = (_question, answer, correct) => {
+      submissions.push([answer as string, correct as string])
+    }
+
+    controller.setEquation('3 * x = 10')
+    controller.operation(0, true, true)
+    controller.moveRequest('/')
+    expect(submissions.at(-1)).toEqual(['/', '/'])
+    controller.step()
+
+    expect(model.getLeftSide()).toEqual([variableTerm('x', true)])
+    expect(model.getRightSide()).toEqual([
+      numberTerm('10'), '/', numberTerm('3'),
+    ])
   })
 
   describe('isLastStep', () => {
@@ -222,6 +311,40 @@ describe('MultistepSolverController', () => {
 
       expect(controller.getState()).toBe('Finished')
       expect(expressions).toEqual(['8 - 3'])
+    })
+  })
+
+  describe('arithmetic answer matching', () => {
+    it.each(['x * 4', '4 * x', '4*x', '4x'])('accepts equivalent answer notation: %s', answer => {
+      const model = new MultistepSolverModel()
+      const controller = new MultistepSolverController(model, fakeView())
+      let submitted: [string, string] | undefined
+      controller.onAnswerSubmit = (_question, playerAnswer, correctAnswer) => {
+        submitted = [playerAnswer, correctAnswer]
+      }
+
+      controller.setEquation('x * 3 + x = 10 + 1')
+      controller.operation(1, false)
+      controller.moveRequest('-')
+      controller.step()
+      submitted = undefined
+      controller.arithmetic(answer)
+
+      expect(submitted).toEqual([answer, '4 * x'])
+      controller.step()
+      expect(controller.getState()).toBe('Idle')
+    })
+
+    it('does not accept a mathematically different expression', () => {
+      const controller = new MultistepSolverController(new MultistepSolverModel(), fakeView())
+      controller.setEquation('x * 3 + x = 10 + 1')
+      controller.operation(1, false)
+      controller.moveRequest('-')
+      controller.step()
+      controller.arithmetic('x * 5')
+      controller.step()
+
+      expect(controller.getState()).toBe('Arithmetic')
     })
   })
 })
