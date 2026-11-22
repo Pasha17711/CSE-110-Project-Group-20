@@ -134,12 +134,14 @@ class MultistepSolverModel {
 
   private moveNegativeTrailingFactorBeforeVariable(side: Array<Term>): void {
     for (let index = 0; index + 4 < side.length; ++index) {
+      const leading = side[index]
+      const variable = side[index + 2]
       const trailing = side[index + 4]
       if (side[index + 1] === '*' && side[index + 3] === '*' &&
-        typeof side[index] !== 'string' && side[index].constant &&
-        typeof side[index + 2] !== 'string' && !side[index + 2].constant &&
+        typeof leading !== 'string' && leading.constant &&
+        typeof variable !== 'string' && !variable.constant &&
         typeof trailing !== 'string' && trailing.constant && !trailing.positive) {
-        side.splice(index, 5, side[index], '*', trailing, '*', side[index + 2])
+        side.splice(index, 5, leading, '*', trailing, '*', variable)
         index += 4
       }
     }
@@ -155,7 +157,7 @@ class MultistepSolverModel {
     if (selected.term === '0' && current.length === 1) return;
 
     const previous = current[index - 1];
-    let value = current[index];
+    let value: TermValue = selected;
     if (isCoefficient) {
       const expression = this.expressionTerms(current).find(candidate =>
         index >= candidate.start && index <= candidate.end,
