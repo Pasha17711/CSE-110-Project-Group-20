@@ -91,6 +91,18 @@ describe("AnswerValidator", () => {
         expect(types()).toEqual([EventType.RoomSolved, EventType.Correct]);
     });
 
+    it("accepts equivalent arithmetic expressions", () => {
+        const result = validator.validateAnswer(
+            question,
+            step("2 * x", "x * 2", true),
+            "main",
+            "room_a",
+        );
+
+        expect(result).toBe(true);
+        expect(types()).toEqual([EventType.RoomSolved, EventType.Correct]);
+    });
+
     it("records every Answer as an AnswerRecord", () => {
         validator.validateAnswer(question, step("+", "-", false), "main", "room_a");
         validator.validateAnswer(question, step("-", "-", false), "main", "room_a");
