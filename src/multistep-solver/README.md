@@ -1,25 +1,32 @@
 # Multistep Solver Usage
 
-The easiest way to use the solver is through `BasicMultistepPuzzle`, which combines the model, view, controller, action menu, and text input.
+The easiest way to use the solver is through `BasicMultistepPuzzle`, the multistep room. It draws the equation on an "EQUATION LOCK" console in the Power Box style and adds everything a player needs:
+
+- an instruction strip that says what to do now (`STEP 2 OF 4 · Work out 14 + 7 on the keypad`),
+- a socket to drop a term into, and labelled ADD / SUBTRACT / MULTIPLY / DIVIDE buttons,
+- a keypad (also driven by the keyboard) with a "LOCK PINS" light per Step,
+- a "LOCK OPEN" panel with the answer when the equation is solved.
 
 ```ts
+import { CONSOLE } from '../multistep-solver/multistep-console'
+
 const puzzle = new BasicMultistepPuzzle('x * 5 + 3 = 8', {
   layer,
-  x: 960,
-  y: 300,
-  width: 700,
-  height: 400,
-  spacing: 24,
-  blockSize: 32,
-  panelColor: '#4b5563',
+  x: 720,                // center of the console
+  y: 500,
+  width: CONSOLE.width,  // the console is drawn at 1240 × 680
+  height: CONSOLE.height,
 })
 
-puzzle.onPuzzleFinished = solved => {
-  console.log(solved ? 'Solved' : 'Failed')
-}
+puzzle.onAnswer = answer => { /* every Step's Answer */ }
+puzzle.onPuzzleFinished = solved => { /* the equation is solved */ }
 ```
 
-The supplied layer must already be attached to a Konva stage. The panel position is centered on `x, y`. `spacing`, `blockSize`, and `panelColor` control the layout and appearance. Action-menu and input dimensions can also be supplied with `actionMenuWidth`, `actionMenuHeight`, `inputWidth`, and `inputHeight`.
+The supplied layer must already be attached to a Konva stage. The Answer that solves the Room is sent `FINAL_ANSWER_MS` (2.5 s) after the answer is shown, or as soon as the player presses "Back to map", so the player sees the answer before leaving.
+
+How many lights the keypad shows comes from `stepsLeft(model)` in `step-counter.ts`: the fewest Steps left from where the equation is now. Players can move terms in any order, so after each Step the total is the Steps solved plus the fewest still to go.
+
+The view takes an optional `theme` (block and drop-zone colors and font, and how operators are shown, e.g. `{ '*': '·' }`), `equationCenter` and `dropZone` (positions inside the panel). Blocks grow with their text, so wide values like `(-12)` no longer spill into their neighbours.
 
 ## Manual MVC usage
 

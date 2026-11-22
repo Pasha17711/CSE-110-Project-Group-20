@@ -141,16 +141,21 @@ class MultistepSolverModel {
     const variableIndex = hasLeadingMinusOperator ? 1 : 0;
     const multiplicationIndex = variableIndex + 1;
     const coefficientIndex = variableIndex + 2;
-    if (side.length !== coefficientIndex + 1 || side[multiplicationIndex] !== '*') {
-      throw Error('A negative sign can only be removed from a sole negative variable term.')
-    }
-
     const variable = side[variableIndex];
-    const coefficient = side[coefficientIndex];
-    if (typeof variable === 'string' || variable.constant ||
-      (!hasLeadingMinusOperator && variable.positive) ||
-      typeof coefficient === 'string' || !coefficient.constant) {
-      throw Error('A negative sign can only be removed from a sole negative variable term.')
+    const isNegativeVariable = variable !== undefined && typeof variable !== 'string' &&
+      !variable.constant && (hasLeadingMinusOperator || !variable.positive);
+
+    // A lone `-x` (no coefficient) is allowed too: `-x = -9` becomes `x = 9`.
+    const isLoneVariable = side.length === variableIndex + 1;
+    if (!(isLoneVariable && isNegativeVariable)) {
+      if (side.length !== coefficientIndex + 1 || side[multiplicationIndex] !== '*') {
+        throw Error('A negative sign can only be removed from a sole negative variable term.')
+      }
+
+      const coefficient = side[coefficientIndex];
+      if (!isNegativeVariable || typeof coefficient === 'string' || !coefficient.constant) {
+        throw Error('A negative sign can only be removed from a sole negative variable term.')
+      }
     }
 
     for (const equationSide of [this.leftSide, this.rightSide]) {

@@ -224,4 +224,17 @@ describe('MultistepSolverView', () => {
     const internal = view as any
     expect(internal.leftSide[4].findOne('.text').text()).toBe('(-3)')
   })
+
+  it('lets the minus sign of a lone -x be dragged away', () => {
+    const { view } = setup()
+    const model = new MultistepSolverModel()
+    model.addLeft(variableTerm('x', false))
+    model.addRight({ term: '9', positive: false, constant: true })
+
+    view.update(model)
+
+    const sign = (view as any).leftSide[0]
+    expect(sign.getAttr('negativeSign')).toBe(true)
+    expect(sign.getAttr('paletteBlock')).toBe(true)
+  })
 })

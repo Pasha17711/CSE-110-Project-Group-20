@@ -1,6 +1,6 @@
 import Konva from "konva";
 import BasicMultistepPuzzle from "../puzzles/basic-multistep-puzzle";
-import type { PuzzleInputType } from "../puzzles/basic-multistep-puzzle";
+import { CONSOLE } from "../multistep-solver/multistep-console";
 import PowerBoxPuzzle from "../puzzles/power-box-puzzle";
 import LaserMatchPuzzle from "../puzzles/laser-match-puzzle";
 import type Puzzle from "../puzzles/puzzle";
@@ -18,6 +18,8 @@ import { COLORS, createBackground, createButton, createText } from "./theme";
 
 /** The puzzle panel, centered at (x, y). */
 const PUZZLE = { x: DESIGN_WIDTH / 2, y: 470, width: 960, height: 480, spacing: 24, blockSize: 40 };
+/** The multistep console is larger and reaches further down the screen. */
+const MULTISTEP = { x: DESIGN_WIDTH / 2, y: 160 + CONSOLE.height / 2, width: CONSOLE.width, height: CONSOLE.height };
 const PANEL_COLOR = "#4b5563";
 /** How long the Correct / Incorrect line stays up. */
 export const FEEDBACK_MS = 1000;
@@ -133,6 +135,11 @@ export class RoomScreen implements RoomScreenContract {
     this.destroyPuzzle();
     this.clearFeedback();
     this.roomName.text(room.name);
+    // The Correct / Incorrect line goes just under whichever puzzle is shown.
+    const bottom = room.puzzle.type === "multistep"
+      ? MULTISTEP.y + MULTISTEP.height / 2 + 6
+      : PUZZLE.y + PUZZLE.height / 2 + 24;
+    this.feedback.y(bottom);
     this.activeRoom = room;
     this.usedHints = Math.max(0, Math.min(MAX_HINTS_PER_ROOM, usedHints));
     this.hintModal.hide();
@@ -220,14 +227,7 @@ export class RoomScreen implements RoomScreenContract {
     const { puzzle } = room;
     switch (puzzle.type) {
       case "multistep": {
-        const inputType: PuzzleInputType = Math.random() < 0.5 ? "keypad" : "typed";
-        return new BasicMultistepPuzzle(room.question.prompt, {
-          ...panel,
-          spacing: PUZZLE.spacing,
-          blockSize: PUZZLE.blockSize,
-          panelColor: PANEL_COLOR,
-          inputType,
-        });
+        return new BasicMultistepPuzzle(room.question.prompt, { ...MULTISTEP, layer: this.layer });
       }
       case "powerBox":
         return new PowerBoxPuzzle(puzzle.pairs, {

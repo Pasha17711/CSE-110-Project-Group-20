@@ -12,6 +12,7 @@ import { RoomScreen, FEEDBACK_MS } from "./RoomScreen";
 import { NotificationManager } from "../notification-manager/NotificationManager";
 import { EventType } from "../notification-manager/GameEvent";
 import { formatMoney, WRONG_ANSWER_PENALTY_SECONDS } from "../score";
+import { CONSOLE } from "../multistep-solver/multistep-console";
 import type { StepAnswer } from "../questions/Question";
 import { visibleTexts } from "./testing/fakeKonva";
 import { created } from "./testing/fakePuzzle";
@@ -164,25 +165,11 @@ describe("RoomScreen", () => {
     expect(screen.layer.getStage()).toBeNull();
   });
 
-  //random value below 0.5 selects keypad
-  it("selects keypad input when random value is below 0.5", () => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.25);
-
+  it("builds the multistep puzzle on the full-size console, with feedback under it", () => {
     screen.setRoom(roomA);
 
-    expect(created[0].options.inputType).toBe("keypad");
-
-    random.mockRestore();
-   });
-
-   //random value above 0.5 selects typed input
-  it("selects typed input when random value is above 0.5", () => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.75);
-
-    screen.setRoom(roomA);
-
-    expect(created[0].options.inputType).toBe("typed");
-
-    random.mockRestore();
+    expect(created[0].options).toMatchObject({ x: 720, width: CONSOLE.width, height: CONSOLE.height });
+    const consoleBottom = (created[0].options.y as number) + CONSOLE.height / 2;
+    expect(screen.layer.findOne<Konva.Text>(".feedback")!.y()).toBeGreaterThan(consoleBottom);
   });
 });
