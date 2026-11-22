@@ -70,6 +70,36 @@ describe('MultistepSolverModel', () => {
       ).join(' ')).toBe(expected)
     })
 
+    it('normalizes a reciprocal divisor in the model, not only in the display', () => {
+      const model = new MultistepSolverModel()
+      addSide(model, [variableTerm('x', true), '/', numberTerm('1/3')], [constantTerm(1)])
+
+      expect(model.getLeftSide()).toEqual([variableTerm('x', true), '*', numberTerm('3')])
+      expect(model.correctOperation(2, true, true)).toBe('/')
+    })
+
+    it('keeps a divisor chain visible instead of folding it into the next answer', () => {
+      const model = new MultistepSolverModel()
+      addSide(model, [variableTerm('x', true), '/', numberTerm('9'), '/', numberTerm('8')], [constantTerm(1)])
+
+      expect(model.getDisplaySide(true).map(({ term }) =>
+        typeof term === 'string' ? term : `${term.positive ? '' : '-'}${term.term}`,
+      ).join(' ')).toBe('x / 9 / 8')
+    })
+
+    it('keeps an unreduced coefficient visible while evaluating it', () => {
+      const model = new MultistepSolverModel()
+      addSide(model,
+        [numberTerm('5'), '*', variableTerm('x', true), '/', numberTerm('10')],
+        [constantTerm(1)],
+      )
+
+      expect(model.getDisplaySide(true).map(({ term }) =>
+        typeof term === 'string' ? term : `${term.positive ? '' : '-'}${term.term}`,
+      ).join(' ')).toBe('5/10 * x')
+      expect(model.arithmeticProblems()).toEqual([])
+    })
+
     it.each<[Term[], Array<[string, string]>]>([
       [
         [numberTerm('8'), numberTerm('3', false)],

@@ -282,6 +282,7 @@ class MultistepSolverView {
     for (let i = 0; i < terms.length; ++i) {
       let term = terms.at(i);
       if (!term) continue;
+      const modelDisplayTerm = displaySide[i]
 
       const isZero = typeof term !== 'string' && term.constant && term.term.split('/')[0] === '0';
       if (i === 0 && hasLeadingMinusOperator && canRemoveNegativeSign) {
@@ -319,11 +320,11 @@ class MultistepSolverView {
         term,
         modelIndex: displaySide[i].modelIndex,
         isCoefficient: displaySide[i].isCoefficient,
-        displayText: isNegativeFactor
+        displayText: modelDisplayTerm.displayText ?? (isNegativeFactor
           ? `(-${term.term})`
           : (i === 0 && typeof term !== 'string' && !term.positive && term.constant && terms[i + 1] === '*')
             ? `-${term.term}`
-            : undefined,
+            : undefined),
       });
     }
 

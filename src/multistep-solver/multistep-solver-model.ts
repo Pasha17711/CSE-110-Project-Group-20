@@ -27,6 +27,7 @@ export interface DisplayTerm {
   /** Index of the corresponding term in the model side. */
   modelIndex: number
   isCoefficient?: boolean
+  displayText?: string
 }
 
 /** Stores and transforms the normalized terms of a multistep equation. */
@@ -64,6 +65,20 @@ class MultistepSolverModel {
     let sideStr = side == this.leftSide ? "left" : "right";
     if (!this.validPush(side, term)) {
       throw Error(`Invalid push to ${sideStr} side of equation!`);
+    }
+    // Keep the model in the same form the view presents. Dividing by a unit
+    // reciprocal is multiplication by its reciprocal (x / 1/3 -> x * 3).
+    if (typeof term !== 'string' && term.constant && side.at(-1) === '/') {
+      const parts = term.term.split('/')
+      if (parts.length === 2 && Math.abs(Number(parts[0])) === 1 && Number(parts[1]) !== 0) {
+        side[side.length - 1] = '*'
+        side.push({
+          term: `${Math.abs(Number(parts[1]))}`,
+          positive: term.positive === (Number(parts[0]) > 0),
+          constant: true,
+        })
+        return
+      }
     }
     side.push(term);
   }
@@ -103,6 +118,33 @@ class MultistepSolverModel {
     this.distributeFactor(newSide, operation, value, false)
   }
 
+  /** Puts a multiplier before a divisor so the raw model matches its display. */
+  private normalizeMovedFactors(side: Array<Term>): void {
+    for (let index = 0; index + 4 < side.length; ++index) {
+      const divisor = side[index + 2]
+      const multiplier = side[index + 4]
+      if (side[index + 1] !== '/' || side[index + 3] !== '*' ||
+        typeof side[index] === 'string' || typeof divisor === 'string' ||
+        typeof multiplier === 'string' || !divisor.constant || !multiplier.constant) continue
+
+      side.splice(index + 1, 4, '*', multiplier, '/', divisor)
+      index += 2
+    }
+  }
+
+  private moveNegativeTrailingFactorBeforeVariable(side: Array<Term>): void {
+    for (let index = 0; index + 4 < side.length; ++index) {
+      const trailing = side[index + 4]
+      if (side[index + 1] === '*' && side[index + 3] === '*' &&
+        typeof side[index] !== 'string' && side[index].constant &&
+        typeof side[index + 2] !== 'string' && !side[index + 2].constant &&
+        typeof trailing !== 'string' && trailing.constant && !trailing.positive) {
+        side.splice(index, 5, side[index], '*', trailing, '*', side[index + 2])
+        index += 4
+      }
+    }
+  }
+
   private moveFromSide(current: Array<Term>, index: number, newSide: Array<Term>, isCoefficient = false) {
     if (current.length === 0 || index < 0 || index >= current.length) {
       throw Error("Unable to move term at specified index.");
@@ -113,13 +155,26 @@ class MultistepSolverModel {
     if (selected.term === '0' && current.length === 1) return;
 
     const previous = current[index - 1];
+    let value = current[index];
+    if (isCoefficient) {
+      const expression = this.expressionTerms(current).find(candidate =>
+        index >= candidate.start && index <= candidate.end,
+      );
+      if (expression) {
+        // A displayed coefficient belongs to the complete signed term. Thus
+        // the 4 in -x / 4 is dragged as -4, not as an unsigned divisor.
+        value = {
+          ...value,
+          positive: this.expressionSign(expression) >= 0,
+        };
+      }
+    }
     if (isCoefficient && previous !== '*' && previous !== '/') {
       this.moveLeadingCoefficient(current, index, newSide)
       return
     }
     if (previous === '*' || previous === '/') {
       const oppositeOp = this.getOppositeOp(previous);
-      const value = current[index];
       current.splice(index - 1, 2);
 
       const newSideArray = newSide.flatMap((term, i) => {
@@ -134,6 +189,11 @@ class MultistepSolverModel {
         return [term, oppositeOp, value];
       });
       current.splice(0, current.length, ...currentArray);
+      if (!value.positive && oppositeOp === '*') {
+        this.moveNegativeTrailingFactorBeforeVariable(newSide);
+      }
+      this.normalizeMovedFactors(current);
+      this.normalizeMovedFactors(newSide);
       return;
     }
 
@@ -402,6 +462,104 @@ class MultistepSolverModel {
     const display: Array<DisplayTerm> = []
 
     for (const expression of expressions) {
+      // Preserve a divisor chain created by a previous solver step. Folding
+      // x / 9 / 8 into x / 72 reveals the next answer in the equation.
+      const rawExpression = side.slice(expression.start, expression.end + 1)
+      const divisionCount = rawExpression.filter(term => term === '/').length
+      const multiplicationCount = rawExpression.filter(term => term === '*').length
+      const variableIndex = rawExpression.findIndex(term =>
+        typeof term !== 'string' && !term.constant,
+      )
+      const hasConstantBeforeVariable = rawExpression
+        .slice(0, variableIndex)
+        .some(term => typeof term !== 'string' && term.constant)
+      const hasConstantAfterVariable = rawExpression
+        .slice(variableIndex + 1)
+        .some(term => typeof term !== 'string' && term.constant)
+      if (expression.variable !== null && divisionCount === 0 && multiplicationCount > 1) {
+        // A multiplication chain is an operation history, not a finished
+        // coefficient. Render its raw factors so b * x * a never becomes
+        // (a*b) * x in the view.
+        for (let index = expression.start; index <= expression.end; ++index) {
+          display.push({ term: side[index], modelIndex: index })
+        }
+        continue
+      }
+      if (expression.variable !== null && divisionCount === 0 && multiplicationCount > 1 &&
+        hasConstantBeforeVariable && (hasConstantAfterVariable ||
+          rawExpression.filter(term => typeof term !== 'string' && term.constant).length > 1)) {
+        const factors = rawExpression
+          .map((term, index) => ({ term, index }))
+          .filter(({ term }) => typeof term !== 'string' && term.constant)
+        const orderedFactors = hasConstantAfterVariable ? factors.reverse() : factors
+        for (const factor of orderedFactors) {
+          display.push({
+            term: factor.term as TermValue,
+            modelIndex: expression.start + factor.index,
+            isCoefficient: true,
+            displayText: typeof factor.term !== 'string' && !factor.term.positive
+              ? `-${factor.term.term}`
+              : undefined,
+          })
+          display.push({ term: '*', modelIndex: expression.start + factor.index })
+        }
+        const variable = rawExpression[variableIndex]
+        if (typeof variable !== 'string') {
+          display.push({ term: variable, modelIndex: expression.start + variableIndex })
+        }
+        continue
+      }
+      if (expression.variable !== null && divisionCount > 1) {
+        for (let index = expression.start; index <= expression.end; ++index) {
+          display.push({ term: side[index], modelIndex: index })
+        }
+        continue
+      }
+
+      // Keep an unreduced coefficient visible while the user is working out
+      // the arithmetic. For example, 5 * x / 10 should be shown as 5/10 * x
+      // rather than x / 2. The model still evaluates the coefficient as 1/2
+      // when the arithmetic answer is submitted.
+      if (expression.variable !== null && divisionCount > 0) {
+        const variableIndex = rawExpression.findIndex(term =>
+          typeof term !== 'string' && !term.constant,
+        )
+        const denominatorIndex = rawExpression.findIndex((term, index) =>
+          index > variableIndex && term === '/',
+        )
+        const leadingNumerator = variableIndex > 0 ? rawExpression[0] : undefined
+        const trailingNumerator = variableIndex >= 0 && rawExpression[variableIndex + 1] === '*'
+          ? rawExpression[variableIndex + 2]
+          : undefined
+        const numerator = leadingNumerator && typeof leadingNumerator !== 'string' && leadingNumerator.constant
+          ? leadingNumerator
+          : trailingNumerator && typeof trailingNumerator !== 'string' && trailingNumerator.constant
+            ? trailingNumerator
+            : undefined
+        const denominator = numerator && rawExpression[denominatorIndex + 1]
+        if (numerator && denominator && typeof denominator !== 'string') {
+          const variable = rawExpression[variableIndex] as TermValue
+          const numeratorIsPositive = numerator.positive === variable.positive
+          const numeratorText = `${numeratorIsPositive ? '' : '-'}${numerator.term}`
+          const denominatorText = `${denominator.positive ? '' : '-'}${denominator.term}`
+          display.push({
+            term: {
+              term: `${numeratorText}/${denominatorText}`,
+              positive: true,
+              constant: true,
+            },
+            modelIndex: expression.start,
+            isCoefficient: true,
+          })
+          display.push({ term: '*', modelIndex: expression.start })
+          display.push({
+            term: { term: expression.variable, positive: true, constant: false },
+            modelIndex: expression.start,
+          })
+          continue
+        }
+      }
+
       if (expression.variable === null) {
         // Display division by a unit-numerator fraction as multiplication by
         // its reciprocal, including for constant-only expressions such as
@@ -631,6 +789,14 @@ class MultistepSolverModel {
         : this.divideFractions(leftValue, rightValue);
       const sign = result.numerator < 0 ? -1 : 1;
       const magnitude = this.absoluteFraction(result);
+      const containingExpression = this.expressionTerms(side).find(expression =>
+        index >= expression.start && index + 2 <= expression.end,
+      );
+      const hasVariableCoefficient = containingExpression?.variable !== null && containingExpression &&
+        side[index - 1] === '*'
+      const displayedSign = hasVariableCoefficient
+        ? this.expressionSign(containingExpression)
+        : sign;
       const replacement: TermValue = {
         term: this.fractionText(magnitude),
         positive: sign >= 0,
@@ -643,13 +809,17 @@ class MultistepSolverModel {
       const displayedRight = rightIsUnitNumeratorFraction
         ? `${rightValue.numerator < 0 ? '-' : ''}${rightValue.denominator}`
         : this.formatTerm(side, index + 2, index + 2);
+      const displayedLeft = this.formatTerm(side, index, index);
+      const signedDisplayedLeft = hasVariableCoefficient && displayedSign < 0 && !displayedLeft.trim().startsWith('-')
+        ? `-${displayedLeft}`
+        : displayedLeft;
 
       problems.push({
         side,
         start: index,
         end: index + 2,
-        text: `${this.formatTerm(side, index, index)} ${displayedOperation} ${displayedRight}`,
-        answer: `${sign < 0 ? '-' : ''}${this.fractionText(magnitude)}`,
+        text: `${signedDisplayedLeft} ${displayedOperation} ${displayedRight}`,
+        answer: `${displayedSign < 0 ? '-' : ''}${this.fractionText(magnitude)}`,
         replacement: [replacement],
       });
     }

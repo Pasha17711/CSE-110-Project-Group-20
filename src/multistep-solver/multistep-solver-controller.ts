@@ -1,7 +1,7 @@
 import { Term, TermOp, TermValue } from './types'
 import MultistepSolverModel from './multistep-solver-model'
 import MultistepSolverView from './multistep-solver-view'
-import { equivalentArithmeticExpressions } from './arithmetic-expression'
+import { acceptableArithmeticAnswer } from './arithmetic-expression'
 
 export type MultistepSolverState = 'Idle' | 'Operation' | 'Arithmetic' | 'Finished'
 
@@ -137,7 +137,7 @@ class MultistepSolverController {
 
     const [stepPrompt, correctAnswer] = problems[0]
     const isLastStep = this.isLastArithmeticStep()
-    this.arithmeticAnswerAccepted = equivalentArithmeticExpressions(answer, correctAnswer)
+    this.arithmeticAnswerAccepted = acceptableArithmeticAnswer(answer, stepPrompt, correctAnswer)
     this.onAnswerSubmit?.(this.equation, answer, correctAnswer, isLastStep,
       stepPrompt)
   }

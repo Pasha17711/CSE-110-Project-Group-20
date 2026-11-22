@@ -212,3 +212,65 @@ export const equivalentArithmeticExpressions = (left: string, right: string): bo
     return false
   }
 }
+
+/**
+ * Checks an arithmetic answer without requiring one exact spelling. Answers
+ * may still reorder multiplication or use an equivalent decimal/fraction,
+ * but they may not leave an operation unsimplified or repeat unary signs.
+ */
+export const acceptableArithmeticAnswer = (
+  answer: string,
+  prompt: string,
+  expected: string,
+): boolean => {
+  if (!equivalentArithmeticExpressions(answer, expected)) return false
+  if (!hasSimplestNumericFraction(answer)) return false
+  if (/^[+-]?\d+(?:\.\d+)?\s*[+*-]\s*[+-]?\d/.test(answer.trim())) return false
+
+  // Repeated unary signs and explicit unit factors are not simplest form.
+  if (/[+-]\s*[+-]/.test(answer) || /(?:^|[+\-(])\s*-?1\s*[*/]/.test(answer) || /[*/]\s*1\s*(?:$|[+\-)])/.test(answer)) {
+    return false
+  }
+
+  // A string made only from numeric factors (or additive terms) is still the
+  // unsimplified prompt, e.g. -9 * -8 or x + x.
+  const withoutLeadingSign = answer.trim().replace(/^[+-]\s*/, '')
+  if (/[*]/.test(withoutLeadingSign) &&
+    !/[A-Za-z]/.test(withoutLeadingSign) &&
+    /^[-+]?\s*\d+(?:\.\d+)?\s*[*/]\s*[-+]?\s*\d/.test(answer)) {
+    return false
+  }
+  if (/[+-]/.test(withoutLeadingSign) && /[A-Za-z]/.test(withoutLeadingSign)) {
+    return false
+  }
+
+  // If the prompt and answer are mathematically identical, only accept the
+  // answer when it has already been reduced to the simple form above.
+  return !equivalentArithmeticExpressions(answer, prompt) || isSimpleAnswer(answer)
+}
+
+function isSimpleAnswer(answer: string): boolean {
+  const text = answer.trim()
+  return hasSimplestNumericFraction(text) &&
+    !/^[+-]?\d+(?:\.\d+)?\s*[+*-]\s*[+-]?\d/.test(text) &&
+    !/[+-]\s*[+-]/.test(text) &&
+    !/(?:^|[+\-(])\s*-?1\s*[*/]/.test(text) &&
+    !/[*/]\s*1\s*(?:$|[+\-)])/.test(text) &&
+    !(/[*]/.test(text) && !/[A-Za-z]/.test(text)) &&
+    !(/[+-]/.test(text.replace(/^[+-]\s*/, '')) && /[A-Za-z]/.test(text))
+}
+
+function hasSimplestNumericFraction(answer: string): boolean {
+  const match = answer.trim().match(/^([+-]?\d+)\/([+-]?\d+)$/)
+  if (!match) return true
+
+  const numerator = Number(match[1])
+  const denominator = Number(match[2])
+  if (denominator <= 0) return false
+  if (denominator === 1) return false
+
+  let left = Math.abs(numerator)
+  let right = denominator
+  while (right !== 0) [left, right] = [right, left % right]
+  return left === 1
+}

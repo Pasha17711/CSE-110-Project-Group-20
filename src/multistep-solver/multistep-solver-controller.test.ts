@@ -163,6 +163,101 @@ describe('MultistepSolverController', () => {
     ])
   })
 
+  it('preserves a negative variable and coefficient order when multiplying by a divisor', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    const prompts: string[] = []
+    controller.onArithmeticStep = prompt => prompts.push(prompt)
+    controller.onAnswerSubmit = (_q, playerAnswer, correctAnswer) => {
+      if (playerAnswer === correctAnswer) controller.step()
+    }
+
+    controller.setEquation('x / 3 = -x / 2')
+    controller.operation(2, true, true)
+    controller.moveRequest('*')
+    controller.step()
+
+    expect(model.getRightSide()).toEqual([
+      variableTerm('x', false), '*', numberTerm('3'), '/', numberTerm('2'),
+    ])
+    expect(model.getDisplaySide(false).map(({ term }) =>
+      typeof term === 'string' ? term : `${term.positive ? '' : '-'}${term.term}`,
+    ).join(' ')).toBe('-3/2 * x')
+    expect(prompts).toContain('-3 / 2')
+  })
+
+  it('preserves unreduced negative coefficients and the original constant numerator', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    const prompts: string[] = []
+    controller.onArithmeticStep = prompt => prompts.push(prompt)
+    controller.onAnswerSubmit = (_q, playerAnswer, correctAnswer) => {
+      if (playerAnswer === correctAnswer) controller.step()
+    }
+
+    controller.setEquation('-8 * x - 8 = -6 * x + 24')
+    controller.operation(0, true, true)
+    controller.moveRequest('/')
+    controller.step()
+
+    expect(model.getDisplaySide(false).map(({ term }) =>
+      typeof term === 'string' ? term : `${term.positive ? '' : '-'}${term.term}`,
+    ).join(' ')).toContain('-6/-8 * x')
+    expect(model.arithmeticProblems()).toEqual([
+      ['-8 / -8', '1'],
+      ['24 / -8', '-3'],
+    ])
+    expect(prompts).toContain('-8 / -8')
+    controller.arithmetic('1')
+    controller.step()
+    expect(prompts).toContain('24 / -8')
+  })
+
+  it('keeps factors and signs separate when clearing a negative divisor', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    const prompts: string[] = []
+    controller.onArithmeticStep = prompt => prompts.push(prompt)
+    controller.onAnswerSubmit = (_q, playerAnswer, correctAnswer) => {
+      if (playerAnswer === correctAnswer) controller.step()
+    }
+
+    controller.setEquation('-x / 4 - 9 = 10 * x - 173')
+    controller.operation(2, true, true)
+    controller.moveRequest('*')
+    controller.step()
+
+    expect(model.getDisplaySide(false).map(({ term }) =>
+      typeof term === 'string' ? term : `${term.positive ? '' : '-'}${term.term}`,
+    ).join(' ')).toContain('10 * -4 * x')
+    expect(model.arithmeticProblems()).toContainEqual(['10 * -4', '-40'])
+    expect(model.arithmeticProblems()).not.toContainEqual(['-10 * -4', '40'])
+    expect(prompts).not.toContain('-10 * -4')
+  })
+
+  it('moves the signed coefficient when dragging the divisor from -x / 4', () => {
+    const model = new MultistepSolverModel()
+    const controller = new MultistepSolverController(model, fakeView())
+    controller.onAnswerSubmit = (_q, playerAnswer, correctAnswer) => {
+      if (playerAnswer === correctAnswer) controller.step()
+    }
+
+    controller.setEquation('-x / 4 - 9 = 10 * x - 173')
+    controller.operation(2, true, true)
+    controller.moveRequest('*')
+    controller.step()
+
+    expect(model.getRightSide()).toEqual([
+      { term: '10', positive: true, constant: true }, '*',
+      { term: '4', positive: false, constant: true },
+      '*', { term: 'x', positive: true, constant: false },
+      { term: '173', positive: false, constant: true }, '*',
+      { term: '4', positive: false, constant: true },
+    ])
+    expect(model.arithmeticProblems()).toContainEqual(['-9 * -4', '36'])
+  })
+
+
   it('uses division when dragging a leading coefficient', () => {
     const model = new MultistepSolverModel()
     const controller = new MultistepSolverController(model, fakeView())
@@ -342,6 +437,19 @@ describe('MultistepSolverController', () => {
       controller.moveRequest('-')
       controller.step()
       controller.arithmetic('x * 5')
+      controller.step()
+
+      expect(controller.getState()).toBe('Arithmetic')
+    })
+
+    it('does not accept the unsimplified arithmetic prompt as its own answer', () => {
+      const controller = new MultistepSolverController(new MultistepSolverModel(), fakeView())
+      controller.setEquation('x + 1 = -9 * -8')
+      controller.operation(1, true)
+      controller.moveRequest('-')
+      controller.step()
+
+      controller.arithmetic('-9 * -8')
       controller.step()
 
       expect(controller.getState()).toBe('Arithmetic')
