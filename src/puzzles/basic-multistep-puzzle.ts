@@ -1,6 +1,7 @@
 import Konva from 'konva'
 
 import ActionMenu from '../multistep-solver/action-menu'
+import { equivalentArithmeticExpressions } from '../multistep-solver/arithmetic-expression'
 import MultistepSolverController from '../multistep-solver/multistep-solver-controller'
 import MultistepSolverModel from '../multistep-solver/multistep-solver-model'
 import MultistepSolverView from '../multistep-solver/multistep-solver-view'
@@ -158,8 +159,8 @@ class BasicMultistepPuzzle implements Puzzle {
 
 
 
-    this.view.onTargetDropped = (index, isLeftSide) => {
-      this.controller.operation(index, isLeftSide)
+    this.view.onTargetDropped = (index, isLeftSide, isCoefficient) => {
+      this.controller.operation(index, isLeftSide, isCoefficient)
     }
     this.view.onNegativeSignDropped = isLeftSide => {
       this.controller.removeNegativeSign(isLeftSide)
@@ -190,7 +191,7 @@ class BasicMultistepPuzzle implements Puzzle {
       this.keypadAnswer = ''
       this.keypad.setAnswer()
 
-      if (playerAnswer === correctAnswer) {
+      if (playerAnswer === correctAnswer || equivalentArithmeticExpressions(playerAnswer, correctAnswer)) {
         this.controller.step()
       }
 
