@@ -82,7 +82,7 @@ class BasicMultistepPuzzle implements Puzzle {
       height: options.inputHeight ?? 50,
       backgroundColor: '#eeeeee',
       foregroundColor: '#000000',
-      ghostText: '?',
+      ghostText: 'Enter an answer',
       ghostTextColor: '#aaaaaa',
     })
 
@@ -278,6 +278,17 @@ class BasicMultistepPuzzle implements Puzzle {
 
   /** Shows `expression =` right-aligned against the input's left edge. */
   private showArithmeticLabel(expression: string): void {
+    const hasVariable = /[A-Za-z]/.test(expression)
+    const hasFraction = /\//.test(expression)
+    const hint = hasVariable
+      ? hasFraction
+        ? 'e.g. 3/2*x or 1.5x; simplest fraction, decimals accepted'
+        : 'e.g. 3*x, 3x, or x*3; decimals accepted'
+      : hasFraction
+        ? 'e.g. 3/2; simplest fraction, decimals accepted'
+        : 'e.g. 12; whole number or decimal'
+
+    this.textInput.ghostText(hint)
     const inputWidth = this.options.inputWidth ?? 100
     const rightEdge = this.options.x - inputWidth / 2 - BasicMultistepPuzzle.LABEL_GAP
     this.arithmeticLabel.text(`${expression} =`)
