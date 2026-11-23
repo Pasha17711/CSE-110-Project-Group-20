@@ -198,7 +198,13 @@ class BasicMultistepPuzzle implements Puzzle {
         this.controller.step()
       }
 
-        this.onAnswer?.({ playerAnswer, correctAnswer, isLastStep, stepPrompt })
+        this.onAnswer?.({
+          playerAnswer,
+          correctAnswer,
+          isLastStep,
+          stepPrompt,
+          ...(stepPrompt !== undefined ? { isMultistepArithmetic: true } : {}),
+        })
     }
 
     this.controller.onArithmeticStep = expression => {
