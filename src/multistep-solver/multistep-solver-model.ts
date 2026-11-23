@@ -812,7 +812,8 @@ class MultistepSolverModel {
         ? `${rightValue.numerator < 0 ? '-' : ''}${rightValue.denominator}`
         : this.formatTerm(side, index + 2, index + 2);
       const displayedLeft = this.formatTerm(side, index, index);
-      const signedDisplayedLeft = hasVariableCoefficient && displayedSign < 0 && !displayedLeft.trim().startsWith('-')
+      const signedDisplayedLeft = hasVariableCoefficient && displayedSign < 0 &&
+        !displayedLeft.trim().startsWith('-') && !displayedRight.trim().startsWith('-')
         ? `-${displayedLeft}`
         : displayedLeft;
 
@@ -820,6 +821,8 @@ class MultistepSolverModel {
         side,
         start: index,
         end: index + 2,
+        // Preserve the containing variable's sign when neither operand shows
+        // it, but do not duplicate a sign already shown by an operand.
         text: `${signedDisplayedLeft} ${displayedOperation} ${displayedRight}`,
         answer: `${displayedSign < 0 ? '-' : ''}${this.fractionText(magnitude)}`,
         replacement: [replacement],

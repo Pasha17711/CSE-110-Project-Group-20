@@ -168,6 +168,11 @@ describe('MultistepSolverModel', () => {
     // `*` or `/` must keep its sign in the text.
     it.each<[string, Term[], [string, string]]>([
       [
+        'x * 9 / (-8)',
+        [variableTerm('x', true), '*', numberTerm('9'), '/', numberTerm('8', false)],
+        ['9 / -8', '-9/8'],
+      ],
+      [
         'x * (-30) - x',
         [variableTerm('x', true), '*', numberTerm('30', false), variableTerm('x', false)],
         ['-30 * x - x', '-31 * x'],
