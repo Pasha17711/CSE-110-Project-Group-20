@@ -6,6 +6,14 @@ import Konva from 'konva';
 import type { FakeNode } from '../screens/testing/fakeKonva';
 import LaserMatchView from './laser-match-view';
 
+// fake Konva doesn't implement easing.
+ // provide a placeholder for hover animation tests.
+Object.assign(Konva, {
+  Easings: {
+    EaseOut: (t: number) => t,
+  },
+});
+
 describe('LaserMatchView', () => {
   it('highlights the graph card when clicked', () => {
   const stage = new Konva.Stage({});
@@ -350,6 +358,96 @@ describe('LaserMatchView', () => {
     expect(view.onMatch).toBeUndefined();
     expect(view.onSolved).toBeUndefined();
   });
+
+
+  it('updates equation status labels when selected and incorrect', () => {
+    const { view, root, graphs } = setup();
+
+    const equationCard = findEquationCard(root, 'y = x + 1');
+    const graphCard = findGraphCard(graphs[0]);
+
+    const hasLabel = (label: string) =>
+      equationCard.getChildren().some(
+        node => node.text() === label
+      );
+
+    expect(hasLabel('SELECT')).toBe(true);
+
+    equationCard.fire('click');
+
+    expect(hasLabel('SELECTED')).toBe(true);
+
+    graphCard.fire('click');
+    view.incorrect(E1, 0);
+
+    expect(hasLabel('SELECT')).toBe(true);
+
+    view.destroy();
+  });
+
+
+  it('updates matched label, laser status, and active counter', () => {
+    const { view, root, graphs } = setup();
+
+    const equationCard = findEquationCard(root, 'y = x + 1');
+    const graphCard = findGraphCard(graphs[0]);
+
+    const activeLabel = root.getChildren().find(
+      node => node.text() === '1 active'
+    );
+
+    const laserLabel = root.getChildren().find(
+      node => node.text() === 'ON'
+    );
+
+    expect(activeLabel).toBeDefined();
+    expect(laserLabel).toBeDefined();
+
+    equationCard.fire('click');
+    graphCard.fire('click');
+
+    view.solve(E1);
+
+    expect(
+      equationCard.getChildren().some(
+        node => node.text() === 'MATCHED'
+      )
+    ).toBe(true);
+
+    expect(laserLabel?.text()).toBe('OFF');
+    expect(activeLabel?.text()).toBe('0 active');
+
+    view.destroy();
+  });
+
+
+  it('applies hover scaling and selected glow', () => {
+    const { view, root } = setup();
+
+    const equationCard = findEquationCard(root, 'y = x + 1');
+    const screen = getScreen(equationCard);
+
+    equationCard.fire('mouseenter');
+
+    expect(equationCard.getAttr('scaleX')).toBe(1.03);
+    expect(equationCard.getAttr('scaleY')).toBe(1.03);
+
+    equationCard.fire('mouseleave');
+
+    expect(equationCard.getAttr('scaleX')).toBe(1);
+    expect(equationCard.getAttr('scaleY')).toBe(1);
+
+    equationCard.fire('click');
+
+    expect(screen.stroke()).toBe('#ffd443');
+    expect(screen.getAttr('shadowColor')).toBe('#ffd443');
+    expect(screen.getAttr('shadowBlur')).toBe(14);
+
+    view.destroy();
+  });
+
+
+
 
 
 
