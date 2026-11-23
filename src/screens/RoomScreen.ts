@@ -19,7 +19,7 @@ import { COLORS, createBackground, createButton, createText } from "./theme";
 /** The puzzle panel, centered at (x, y). */
 const PUZZLE = { x: DESIGN_WIDTH / 2, y: 470, width: 960, height: 480, spacing: 24, blockSize: 40 };
 /** The multistep console is larger and reaches further down the screen. */
-const MULTISTEP = { x: DESIGN_WIDTH / 2, y: 160 + CONSOLE.height / 2, width: CONSOLE.width, height: CONSOLE.height };
+const MULTISTEP = { x: DESIGN_WIDTH / 2, y: 160 + CONSOLE.height / 2 };
 const PANEL_COLOR = "#4b5563";
 /** How long the Correct / Incorrect line stays up. */
 export const FEEDBACK_MS = 1000;
@@ -137,7 +137,7 @@ export class RoomScreen implements RoomScreenContract {
     this.roomName.text(room.name);
     // The Correct / Incorrect line goes just under whichever puzzle is shown.
     const bottom = room.puzzle.type === "multistep"
-      ? MULTISTEP.y + MULTISTEP.height / 2 + 6
+      ? MULTISTEP.y + CONSOLE.height / 2 + 6
       : PUZZLE.y + PUZZLE.height / 2 + 24;
     this.feedback.y(bottom);
     this.activeRoom = room;

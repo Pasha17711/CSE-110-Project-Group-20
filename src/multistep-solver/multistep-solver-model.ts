@@ -178,6 +178,31 @@ class MultistepSolverModel {
     }
   }
 
+  /** An independent copy of this equation, for trying changes without touching it. */
+  clone(): MultistepSolverModel {
+    const copy = (term: Term): Term => (typeof term === 'string' ? term : { ...term });
+    const scratch = new MultistepSolverModel();
+    this.leftSide.forEach(term => scratch.addLeft(copy(term)));
+    this.rightSide.forEach(term => scratch.addRight(copy(term)));
+    return scratch;
+  }
+
+  /** True for `x = n` or `n = x` (a lone positive variable against a lone constant). */
+  isSolved(): boolean {
+    const isVariable = (side: Array<Term>): boolean => {
+      if (side.length !== 1) return false;
+      const term = side[0];
+      return typeof term !== 'string' && !term.constant && term.positive;
+    };
+    const isConstant = (side: Array<Term>): boolean => {
+      if (side.length !== 1) return false;
+      const term = side[0];
+      return typeof term !== 'string' && term.constant;
+    };
+    return (isVariable(this.leftSide) && isConstant(this.rightSide)) ||
+      (isConstant(this.leftSide) && isVariable(this.rightSide));
+  }
+
   /** Removes all terms from both sides. */
   reset(): void {
     this.leftSide.splice(0, this.leftSide.length);

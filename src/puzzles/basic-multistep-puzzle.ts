@@ -5,22 +5,23 @@ import MultistepSolverController, { type MultistepSolverState } from '../multist
 import MultistepSolverModel from '../multistep-solver/multistep-solver-model'
 import MultistepSolverView, { type MultistepSolverTheme } from '../multistep-solver/multistep-solver-view'
 import OperationButtons from '../multistep-solver/operation-buttons'
-import { answerText, stepsLeft } from '../multistep-solver/step-counter'
+import { answerText, display, displayExpression, normalizeKeypadAnswer, keyboardKey } from '../multistep-solver/answer-format'
+import { stepsLeft } from '../multistep-solver/step-counter'
 import type { TermOp } from '../multistep-solver/types'
-import { formatMath } from '../questions/formatMath'
 import type { StepAnswer } from '../questions/Question'
 import KeypadInput from '../text-input/keypad-input'
 import type Puzzle from './puzzle'
 
+/**
+ * Where to draw the puzzle. The console is always CONSOLE.width ×
+ * CONSOLE.height (1240 × 680) in the design space; the whole screen is
+ * scaled to the window by `fitLayer`, so it needs no size of its own.
+ */
 export interface BasicMultistepPuzzleOptions {
   layer: Konva.Layer
   /** Center of the console. */
   x: number
   y: number
-  /** The console is drawn at CONSOLE.width × CONSOLE.height (1240 × 680). */
-  width: number
-  height: number
-  spacing?: number
   /** Height of the equation's blocks. */
   blockSize?: number
 }
@@ -64,8 +65,10 @@ const OPERATION_VERBS: Record<TermOp, string> = {
  * The multistep room: an equation to solve one Step at a time. The player
  * drags a term into the socket and picks how to undo it (an Operation Step),
  * then works out the arithmetic on the keypad (an Arithmetic Step). The
- * keypad's lights show how many Steps are solved, the strip at the top says
- * what to do now, and the answer stays on screen for a moment at the end.
+ * keypad has one light per Step of par (the fewest Steps that solve it), lit
+ * as Steps are solved; a longer way round shows "+1" instead of adding
+ * lights. The strip at the top says what to do now, and the answer stays on
+ * screen for a moment at the end.
  */
 class BasicMultistepPuzzle implements Puzzle {
   private readonly model = new MultistepSolverModel()
@@ -77,7 +80,8 @@ class BasicMultistepPuzzle implements Puzzle {
 
   private keypadAnswer = ''
   private solvedSteps = 0
-  private totalSteps = 0
+  /** The fewest Steps that solve the equation, worked out once at the start. */
+  private par = 0
   private interactionEnabled = true
   /** The Answer that solves the Room, held until the player has seen the answer. */
   private finalAnswer: StepAnswer | null = null
@@ -98,7 +102,7 @@ class BasicMultistepPuzzle implements Puzzle {
   /**
    * Creates and initializes a puzzle.
    * @param equation Initial equation string.
-   * @param options Layer, console center and size.
+   * @param options Layer and console center.
    */
   constructor(equation: string, options: BasicMultistepPuzzleOptions) {
     this.validateOptions(options)
@@ -132,7 +136,7 @@ class BasicMultistepPuzzle implements Puzzle {
 
     this.connectComponents()
     this.controller.setEquation(equation)
-    this.totalSteps = stepsLeft(this.model)
+    this.par = stepsLeft(this.model)
     this.console.setEquationCaption('Goal: get x alone on one side')
     this.showState(this.controller.getState())
 
@@ -143,14 +147,8 @@ class BasicMultistepPuzzle implements Puzzle {
     if (!options.layer.getStage()) {
       throw Error('BasicMultistepPuzzle requires a layer attached to a Konva stage.')
     }
-    if (!Number.isFinite(options.width) || options.width <= 0) {
-      throw Error('BasicMultistepPuzzle width must be a positive number.')
-    }
-    if (!Number.isFinite(options.height) || options.height <= 0) {
-      throw Error('BasicMultistepPuzzle height must be a positive number.')
-    }
-    if (options.spacing !== undefined && (!Number.isFinite(options.spacing) || options.spacing < 0)) {
-      throw Error('BasicMultistepPuzzle spacing must be a non-negative number.')
+    if (!Number.isFinite(options.x) || !Number.isFinite(options.y)) {
+      throw Error('BasicMultistepPuzzle needs a finite center (x, y).')
     }
   }
 
@@ -179,7 +177,6 @@ class BasicMultistepPuzzle implements Puzzle {
       if (isLastStep) this.finalAnswer = answer
       this.controller.step()
       if (this.controller.getState() !== 'Finished') {
-        this.totalSteps = this.solvedSteps + stepsLeft(this.model)
         this.console.setEquationCaption(wasOperation
           ? `You ${OPERATION_VERBS[playerAnswer as TermOp] ?? 'changed'} both sides. Keep going!`
           : 'Worked out. Keep going!')
@@ -239,9 +236,9 @@ class BasicMultistepPuzzle implements Puzzle {
         this.keypad.setEnabled(false)
         this.keypad.setPrompt('Answer')
         this.keypad.showResult(answer)
-        this.console.setInstruction('SOLVED', `${display(answer)}. ${plural(this.solvedSteps, 'lock pin')} set.`, 'done')
+        this.console.setInstruction('SOLVED', `${display(answer)}. The lock is open.`, 'done')
         this.console.setEquationCaption('')
-        this.console.showSolved(display(answer), `Solved in ${plural(this.solvedSteps, 'step')}`)
+        this.console.showSolved(display(answer), this.solvedSummary())
         if (this.finalAnswer) this.finalTimer = setTimeout(() => this.releaseFinalAnswer(), FINAL_ANSWER_MS)
         this.onPuzzleFinished?.(true)
         break
@@ -259,13 +256,19 @@ class BasicMultistepPuzzle implements Puzzle {
     return loneNegativeX && loneNumber
   }
 
+  /** "STEP 3 · PAR 4": which Step this is, and the fewest Steps that solve it. */
   private stepTag(): string {
-    return `STEP ${Math.min(this.solvedSteps + 1, this.totalSteps)} OF ${this.totalSteps}`
+    return `STEP ${this.solvedSteps + 1} · PAR ${this.par}`
+  }
+
+  /** "Solved in 4 steps, right on par!" or "Solved in 5 steps (par 4)". */
+  private solvedSummary(): string {
+    const steps = `Solved in ${plural(this.solvedSteps, 'step')}`
+    return this.solvedSteps <= this.par ? `${steps}, right on par!` : `${steps} (par ${this.par})`
   }
 
   private updateProgress(): void {
-    if (this.controller.getState() === 'Finished') this.totalSteps = this.solvedSteps
-    this.keypad.setProgress(this.solvedSteps, this.totalSteps)
+    this.keypad.setProgress(this.solvedSteps, this.par)
   }
 
   private showWrong(): void {
@@ -352,87 +355,6 @@ class BasicMultistepPuzzle implements Puzzle {
 /** "1 step", "4 steps". */
 function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`
-}
-
-/** `*` as `·` and `-` as `−`, for reading only. */
-function display(text: string): string {
-  return formatMath(text).replace(/-/g, '−')
-}
-
-/**
- * An expression to work out, as a player writes it. When it combines x terms,
- * each is written number first, but every sign stays where it was, since
- * working out a double sign is part of the Step: `x * 5 - x / -2` reads
- * `5x − x/(−2)` and `x * -3 - x * 7` reads `−3x − 7x`. Plain arithmetic
- * (`14 - -3`, `21 / 3`) only gets `·` and `−`.
- */
-export function displayExpression(expression: string): string {
-  if (!/\bx\b/.test(expression)) return display(expression)
-  const parts = expression.split(/ ([+-]) /)
-  let shown = ''
-  for (let i = 0; i < parts.length; i += 2) {
-    const term = readXTerm(parts[i], i === 0)
-    if (term === null) return display(expression)
-    shown += i === 0 ? term : ` ${parts[i - 1] === '-' ? '−' : '+'} ${term}`
-  }
-  return shown
-}
-
-/**
- * One x term written number first (`x * 5` reads `5x`, `x / 2` reads `x/2`).
- * A negative number gets brackets after another sign: `(−3)x`, `x/(−2)`;
- * at the very start it doesn't need them: `−3x`.
- */
-function readXTerm(text: string, first: boolean): string | null {
-  const times = /^(-?)x \* (-?)(\d+(?:\/\d+)?)$/.exec(text)
-  if (times) {
-    const [, xSign, numberSign, number] = times
-    const coefficient = number === '1' ? '' : number
-    if (numberSign !== '-') return `${xSign ? '−' : ''}${coefficient}x`
-    if (first && !xSign) return `−${coefficient}x`
-    return `${xSign ? '−' : ''}(−${number})x`
-  }
-  const divided = /^(-?)x \/ (-?)(\d+)$/.exec(text)
-  if (divided) {
-    const [, xSign, numberSign, number] = divided
-    return `${xSign ? '−' : ''}x/${numberSign ? `(−${number})` : number}`
-  }
-  return null
-}
-
-/** The keypad key a keyboard key stands for, or null if it isn't one. */
-export function keyboardKey(key: string): string | null {
-  if (/^\d$/.test(key)) return key
-  switch (key) {
-    case 'x': case 'X': return 'x'
-    case '-': case '−': return '-'
-    case '/': return '/'
-    case 'Backspace': return '⌫'
-    case 'Delete': case 'Escape': return 'C'
-    case 'Enter': return 'Enter'
-    default: return null
-  }
-}
-
-/**
- * Turns what the player typed into the form the solver checks, or null if it
- * isn't an answer yet: whole numbers and fractions as typed ("-21", "3/4"),
- * and an x term as "x * 3" or "-x * 3" whether typed "3x" or "x3".
- */
-export function normalizeKeypadAnswer(typed: string): string | null {
-  const answer = typed.trim()
-  const number = /^-?\d+(\/\d+)?$/
-  if (number.test(answer)) return hasZeroDenominator(answer) ? null : answer
-
-  const term = /^(-?)(\d+(?:\/\d+)?)?x(\d+(?:\/\d+)?)?$/.exec(answer)
-  if (!term || (term[2] && term[3])) return null
-  const coefficient = term[2] ?? term[3] ?? '1'
-  if (hasZeroDenominator(coefficient)) return null
-  return `${term[1]}x * ${coefficient}`
-}
-
-function hasZeroDenominator(value: string): boolean {
-  return value.includes('/') && Number(value.split('/')[1]) === 0
 }
 
 export default BasicMultistepPuzzle

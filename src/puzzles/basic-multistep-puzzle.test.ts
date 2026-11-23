@@ -3,13 +3,7 @@ import type Konva from 'konva'
 
 vi.mock('konva', () => import('../screens/testing/fakeKonva'))
 
-import BasicMultistepPuzzle, {
-  FINAL_ANSWER_MS,
-  displayExpression,
-  keyboardKey,
-  normalizeKeypadAnswer,
-} from './basic-multistep-puzzle'
-import { CONSOLE } from '../multistep-solver/multistep-console'
+import BasicMultistepPuzzle, { FINAL_ANSWER_MS } from './basic-multistep-puzzle'
 import { FakeLayer, FakeStage, visibleTexts, type FakeNode } from '../screens/testing/fakeKonva'
 import type { StepAnswer } from '../questions/Question'
 
@@ -30,7 +24,7 @@ function setup(equation = EQUATION) {
   stage.add(layer)
   const puzzle = new BasicMultistepPuzzle(equation, {
     layer: layer as unknown as Konva.Layer,
-    x: 720, y: 500, width: CONSOLE.width, height: CONSOLE.height,
+    x: 720, y: 500,
   })
   const answers: StepAnswer[] = []
   puzzle.onAnswer = answer => answers.push(answer)
@@ -66,12 +60,12 @@ describe('BasicMultistepPuzzle', () => {
     vi.useRealTimers()
   })
 
-  it('starts on Step 1 of 4 with every lock pin dark, asking for a term', () => {
+  it('starts on Step 1 with a light per Step of par (4), all dark, asking for a term', () => {
     const t = setup()
 
     expect(t.lights()).toBe(4)
     expect(t.lit()).toBe(0)
-    expect(t.find('step-tag').text()).toBe('STEP 1 OF 4')
+    expect(t.find('step-tag').text()).toBe('STEP 1 · PAR 4')
     expect(t.find('step-message').text()).toContain('Drag a term')
     expect(visibleTexts(t.layer)).toEqual(expect.arrayContaining(['ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE']))
   })
@@ -109,7 +103,7 @@ describe('BasicMultistepPuzzle', () => {
 
     expect(t.lit()).toBe(1)
     expect(t.find('keypad-prompt').text()).toBe('14 + 7 =')
-    expect(t.find('step-tag').text()).toBe('STEP 2 OF 4')
+    expect(t.find('step-tag').text()).toBe('STEP 2 · PAR 4')
   })
 
   it('takes an answer typed on the keypad', () => {
@@ -218,7 +212,37 @@ describe('BasicMultistepPuzzle', () => {
 
     expect(t.find('solved-answer').text()).toBe('x = 9')
     expect(t.lit()).toBe(1)
-    expect(visibleTexts(t.layer)).toContain('Solved in 1 step')
+    expect(visibleTexts(t.layer)).toContain('Solved in 1 step, right on par!')
+  })
+
+  it('a longer way round keeps the lights at par and shows the extra Steps as +1', () => {
+    const t = setup()
+    // Move the 3 first (5 Steps) instead of the -7 (par 4).
+    t.internals.controller.operation(2, true)
+    t.find('operation-/').fire('click')
+    t.press('-', '7', '/', '3', 'Enter')
+    t.press('1', '4', '/', '3', 'Enter')
+    expect(t.lit()).toBe(3)
+    t.internals.controller.operation(1, true)
+    t.find('operation-+').fire('click')
+    expect(t.lit()).toBe(4)
+    expect(t.lights()).toBe(4)
+    expect(t.find('step-tag').text()).toBe('STEP 5 · PAR 4')
+
+    t.press('7', 'Enter')
+
+    expect(t.lights()).toBe(4)
+    expect(t.find('keypad-progress').text()).toBe('+1')
+    expect(t.find('solved-answer').text()).toBe('x = 7')
+    expect(visibleTexts(t.layer)).toContain('Solved in 5 steps (par 4)')
+  })
+
+  it('solving on par says so', () => {
+    vi.useFakeTimers()
+    const t = setup()
+    solve(t)
+    expect(visibleTexts(t.layer)).toContain('Solved in 4 steps, right on par!')
+    expect(t.find('keypad-progress').text()).toBe('4/4')
   })
 
   it('destroy removes everything it drew', () => {
@@ -229,50 +253,9 @@ describe('BasicMultistepPuzzle', () => {
 
   it('rejects a layer that is not on a stage', () => {
     const layer = new FakeLayer() as unknown as Konva.Layer
-    expect(() => new BasicMultistepPuzzle(EQUATION, { layer, x: 0, y: 0, width: 10, height: 10 })).toThrow()
+    expect(() => new BasicMultistepPuzzle(EQUATION, { layer, x: 0, y: 0 })).toThrow()
   })
 })
 
-describe('normalizeKeypadAnswer', () => {
-  it.each([
-    ['21', '21'],
-    ['-21', '-21'],
-    ['3/4', '3/4'],
-    ['-3/4', '-3/4'],
-    ['3x', 'x * 3'],
-    ['x3', 'x * 3'],
-    ['-3x', '-x * 3'],
-    ['11/2x', 'x * 11/2'],
-    ['x', 'x * 1'],
-  ])('reads %s as %s', (typed, expected) => {
-    expect(normalizeKeypadAnswer(typed as string)).toBe(expected)
-  })
 
-  it.each(['', '-', '3/', '3/0', '3x4', 'x/0', '1/2/3'])('is not an answer yet: %s', typed => {
-    expect(normalizeKeypadAnswer(typed as string)).toBeNull()
-  })
-})
 
-describe('displayExpression', () => {
-  it.each([
-    ['14 + 7', '14 + 7'],
-    ['x * -3 - x * 7', '−3x − 7x'],
-    ['x * 1/2 + x * 3', '1/2x + 3x'],
-    ['x * 5 - x / -2', '5x − x/(−2)'],
-    ['x * 5 - x * -2', '5x − (−2)x'],
-    ['x / 3 - x / 6', 'x/3 − x/6'],
-    ['-x * 3 + x * 2', '−3x + 2x'],
-    ['14 - -3', '14 − −3'],
-    ['21 / 3', '21 / 3'],
-    ['-3 * 4', '−3 · 4'],
-  ])('shows %s as %s', (expression, shown) => {
-    expect(displayExpression(expression as string)).toBe(shown)
-  })
-})
-
-describe('keyboardKey', () => {
-  it('maps keyboard keys to keypad keys', () => {
-    expect(['7', 'X', '-', '/', 'Backspace', 'Escape', 'Enter', 'a'].map(keyboardKey))
-      .toEqual(['7', 'x', '-', '/', '⌫', 'C', 'Enter', null])
-  })
-})

@@ -74,7 +74,7 @@ describe("KeypadInput", () => {
         expect(node(keypad, "keypad-prompt").text()).toBe("14 + 7 =");
     });
 
-    it("lights one lock pin per solved Step", () => {
+    it("lights one lock pin per solved Step, with one light per Step of par", () => {
         const keypad = new KeypadInput();
 
         keypad.setProgress(1, 4);
@@ -85,11 +85,13 @@ describe("KeypadInput", () => {
         expect(node(keypad, "keypad-progress").text()).toBe("1/4");
     });
 
-    it("never lights more pins than there are", () => {
+    it("keeps the lights at par and shows Steps beyond it as +n", () => {
         const keypad = new KeypadInput();
-        keypad.setProgress(9, 3);
-        const lit = (keypad as unknown as FakeNode).find((n) => n.name() === "light-on");
-        expect(lit).toHaveLength(3);
+        keypad.setProgress(5, 3);
+        const lights = (keypad as unknown as FakeNode).find((n) => /light-(on|off)/.test(String(n.name())));
+        expect(lights).toHaveLength(3);
+        expect(lights.every((n) => n.name() === "light-on")).toBe(true);
+        expect(node(keypad, "keypad-progress").text()).toBe("+2");
     });
 
     it("flashes TRY AGAIN after a wrong answer, then clears", () => {

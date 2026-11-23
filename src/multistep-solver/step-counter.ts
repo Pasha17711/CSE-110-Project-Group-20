@@ -1,5 +1,4 @@
-import MultistepSolverModel from './multistep-solver-model'
-import type { Term } from './types'
+import type MultistepSolverModel from './multistep-solver-model'
 
 /** Search limits, so an unusual equation can never freeze the game. */
 const MAX_STEPS = 16
@@ -17,7 +16,7 @@ const MAX_STATES = 4000
  * equation is already solved.
  */
 export function stepsLeft(model: MultistepSolverModel): number {
-  const start = copyModel(model)
+  const start = model.clone()
   const startArithmetic = solveArithmetic(start)
   if (startArithmetic === null) return 0
 
@@ -28,11 +27,11 @@ export function stepsLeft(model: MultistepSolverModel): number {
   while (queue.length > 0) {
     queue.sort((a, b) => a.steps - b.steps)
     const { state, steps } = queue.shift()!
-    if (isSolved(state)) return steps
+    if (state.isSolved()) return steps
     if (steps >= MAX_STEPS || best.size > MAX_STATES) break
 
     for (const move of possibleMoves(state)) {
-      const scratch = copyModel(state)
+      const scratch = state.clone()
       try {
         move(scratch)
       } catch {
@@ -82,36 +81,6 @@ function solveArithmetic(model: MultistepSolverModel): number | null {
   return steps
 }
 
-function copyModel(model: MultistepSolverModel): MultistepSolverModel {
-  const copy = (term: Term): Term => (typeof term === 'string' ? term : { ...term })
-  const scratch = new MultistepSolverModel()
-  model.getLeftSide().forEach(term => scratch.addLeft(copy(term)))
-  model.getRightSide().forEach(term => scratch.addRight(copy(term)))
-  return scratch
-}
-
 function keyOf(model: MultistepSolverModel): string {
   return JSON.stringify([model.getLeftSide(), model.getRightSide()])
-}
-
-/** True for `x = n` or `n = x` (a lone positive variable against a lone constant). */
-function isSolved(model: MultistepSolverModel): boolean {
-  const left = model.getLeftSide()
-  const right = model.getRightSide()
-  const isVariable = (side: Array<Term>): boolean =>
-    side.length === 1 && typeof side[0] !== 'string' && !side[0].constant && side[0].positive
-  const isConstant = (side: Array<Term>): boolean =>
-    side.length === 1 && typeof side[0] !== 'string' && side[0].constant
-  return (isVariable(left) && isConstant(right)) || (isConstant(left) && isVariable(right))
-}
-
-/** The solved equation as the player should read it, e.g. `x = 7` or `x = -3/4`. */
-export function answerText(model: MultistepSolverModel): string {
-  const sides = [model.getLeftSide(), model.getRightSide()]
-  const variable = sides.find(side => side.length === 1 && typeof side[0] !== 'string' && !side[0].constant)
-  const constant = sides.find(side => side.length === 1 && typeof side[0] !== 'string' && side[0].constant)
-  if (!variable || !constant) return ''
-  const v = variable[0] as Exclude<Term, string>
-  const c = constant[0] as Exclude<Term, string>
-  return `${v.term} = ${c.positive ? '' : '-'}${c.term}`
 }

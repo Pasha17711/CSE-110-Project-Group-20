@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import MultistepSolverModel from './multistep-solver-model'
 import MultistepSolverController from './multistep-solver-controller'
 import type MultistepSolverView from './multistep-solver-view'
-import { answerText, stepsLeft } from './step-counter'
+import { stepsLeft } from './step-counter'
 
 const fakeView = {
   update() {}, showDropzone() {}, hideDropzone() {}, clearDropzone() {},
@@ -46,16 +46,5 @@ describe('stepsLeft', () => {
     const model = load('x * 3 - 7 = 14')
     model.moveLeftTerm(3) // x * 3 = 14 + 7, with 14 + 7 to work out
     expect(stepsLeft(model)).toBe(3)
-  })
-})
-
-describe('answerText', () => {
-  it('reads a solved equation either way round', () => {
-    expect(answerText(load('x = 7'))).toBe('x = 7')
-    expect(answerText(load('-3/4 = x'))).toBe('x = -3/4')
-  })
-
-  it('is empty while the equation is unsolved', () => {
-    expect(answerText(load('x + 1 = 2'))).toBe('')
   })
 })

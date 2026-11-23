@@ -1,5 +1,7 @@
 import Konva from 'konva'
 
+import { INDUSTRIAL } from '../screens/industrial-theme'
+import { setCursor } from '../screens/theme'
 import type { TermOp } from './types'
 
 /** Size of the 2 × 2 block of buttons, from its top-left corner. */
@@ -19,13 +21,9 @@ export const OPERATIONS: ReadonlyArray<{ op: TermOp, symbol: string, word: strin
 ]
 
 const STYLE = {
-  face: [0, '#e9ecef', 1, '#b6bdc5'],
-  hoverFace: [0, '#fff1a8', 1, '#f5c400'],
-  edge: '#1b1d22',
-  text: '#1a1a1a',
-  badge: '#1b1d22',
+  ...INDUSTRIAL,
+  badge: INDUSTRIAL.edge,
   badgeText: '#ffd447',
-  title: 'Fredoka, sans-serif',
 } as const
 
 /**
@@ -74,7 +72,7 @@ class OperationButtons extends Konva.Group {
       width: BUTTON_WIDTH, height: BUTTON_HEIGHT, cornerRadius: 14,
       fillLinearGradientStartPoint: { x: 0, y: 0 },
       fillLinearGradientEndPoint: { x: 0, y: BUTTON_HEIGHT },
-      fillLinearGradientColorStops: [...STYLE.face],
+      fillLinearGradientColorStops: [...STYLE.keyFace],
       stroke: STYLE.edge, strokeWidth: 3, name: 'operation-face',
     }))
     top.add(new Konva.Circle({
@@ -88,7 +86,7 @@ class OperationButtons extends Konva.Group {
     top.add(new Konva.Text({
       x: 76, width: BUTTON_WIDTH - 90, height: BUTTON_HEIGHT, verticalAlign: 'middle',
       text: operation.word, fontFamily: STYLE.title, fontStyle: 'bold', fontSize: 24,
-      letterSpacing: 1, fill: STYLE.text, listening: false,
+      letterSpacing: 1, fill: STYLE.keyText, listening: false,
     }))
     button.add(top)
 
@@ -113,14 +111,9 @@ class OperationButtons extends Konva.Group {
 
   private paint(button: Konva.Group, hover: boolean): void {
     const face = button.findOne<Konva.Rect>('.operation-face')
-    face?.setAttr('fillLinearGradientColorStops', [...(hover ? STYLE.hoverFace : STYLE.face)])
+    face?.setAttr('fillLinearGradientColorStops', [...(hover ? STYLE.keyHighlight : STYLE.keyFace)])
     this.getLayer()?.batchDraw()
   }
-}
-
-function setCursor(node: Konva.Node, cursor: string): void {
-  const container = node.getStage()?.container()
-  if (container) container.style.cursor = cursor
 }
 
 export default OperationButtons

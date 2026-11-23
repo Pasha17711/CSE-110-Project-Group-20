@@ -168,7 +168,7 @@ describe("RoomScreen", () => {
   it("builds the multistep puzzle on the full-size console, with feedback under it", () => {
     screen.setRoom(roomA);
 
-    expect(created[0].options).toMatchObject({ x: 720, width: CONSOLE.width, height: CONSOLE.height });
+    expect(created[0].options).toMatchObject({ x: 720 });
     const consoleBottom = (created[0].options.y as number) + CONSOLE.height / 2;
     expect(screen.layer.findOne<Konva.Text>(".feedback")!.y()).toBeGreaterThan(consoleBottom);
   });

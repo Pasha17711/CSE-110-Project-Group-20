@@ -1,7 +1,6 @@
 import Konva from 'konva'
 
 import BasicMultistepPuzzle from './basic-multistep-puzzle'
-import { CONSOLE } from '../multistep-solver/multistep-console'
 
 const stage = new Konva.Stage({
   container: 'container',
@@ -16,8 +15,6 @@ const puzzle = new BasicMultistepPuzzle('x * 5 + 3 = 8', {
   layer,
   x: 1920 / 2,
   y: 1080 / 2,
-  width: CONSOLE.width,
-  height: CONSOLE.height,
 })
 
 puzzle.onPuzzleFinished = solved => {

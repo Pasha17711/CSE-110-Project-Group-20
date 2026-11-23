@@ -1,4 +1,6 @@
 import Konva from "konva";
+import { INDUSTRIAL } from "../screens/industrial-theme";
+import { setCursor } from "../screens/theme";
 
 /** Size of the keypad unit, from its top-left corner. */
 export const KEYPAD_WIDTH = 364;
@@ -10,25 +12,10 @@ export const WRONG_FLASH_MS = 700;
 /** Most lights the "LOCK PINS" row draws; longer puzzles share the row. */
 const MAX_LIGHTS = 8;
 
-/** Industrial look shared with the Power Box. */
+/** The industrial look shared with the Power Box and the multistep console. */
 const STYLE = {
-    casing: "#2a2d33",
-    casingEdge: "#15171a",
-    label: "#c9ced4",
-    lcd: "#0c1a10",
-    lcdDim: "#3f9e52",
-    lcdText: "#5dff7a",
-    lcdPlaceholder: "#2f7a3e",
-    wrongText: "#ff5a5a",
-    ledOn: "#4cff6a",
-    ledOff: "#5c1414",
-    keyFace: [0, "#eef1f4", 1, "#b8bfc7"],
+    ...INDUSTRIAL,
     xFace: [0, "#ffe680", 1, "#f5c400"],
-    enterFace: [0, "#8dffa0", 1, "#2fbf4a"],
-    keyEdge: "#1b1d22",
-    keyText: "#1a1a1a",
-    title: "Fredoka, sans-serif",
-    mono: "'Courier New', monospace",
 } as const;
 
 const PAD = 20;
@@ -92,14 +79,14 @@ export default class KeypadInput extends Konva.Group {
 
         this.add(new Konva.Rect({
             width: KEYPAD_WIDTH, height: KEYPAD_HEIGHT,
-            fill: STYLE.casing, stroke: STYLE.casingEdge, strokeWidth: 4,
+            fill: STYLE.housing, stroke: STYLE.housingEdge, strokeWidth: 4,
             cornerRadius: 18, listening: false,
         }));
 
         this.add(new Konva.Text({
             x: PAD, y: 18, height: 28, verticalAlign: "middle",
             text: "LOCK PINS", fontFamily: STYLE.title, fontStyle: "600",
-            fontSize: 15, letterSpacing: 2, fill: STYLE.label, listening: false,
+            fontSize: 15, letterSpacing: 2, fill: STYLE.housingText, listening: false,
         }));
         this.add(this.lights);
         this.progressText = new Konva.Text({
@@ -111,7 +98,7 @@ export default class KeypadInput extends Konva.Group {
         this.add(this.progressText);
 
         this.add(new Konva.Rect({
-            ...LCD, fill: STYLE.lcd, stroke: STYLE.casingEdge, strokeWidth: 4,
+            ...LCD, fill: STYLE.lcd, stroke: STYLE.housingEdge, strokeWidth: 4,
             cornerRadius: 10, listening: false,
         }));
         this.promptDisplay = new Konva.Text({
@@ -130,7 +117,7 @@ export default class KeypadInput extends Konva.Group {
         this.add(this.promptDisplay, this.answerDisplay);
 
         for (const spec of KEYS) this.addKey(spec, STYLE.keyFace, () => this.onKeyPressed?.(spec.key));
-        this.addKey(ENTER, STYLE.enterFace, () => this.onSubmit?.(), 17);
+        this.addKey(ENTER, STYLE.keyGo, () => this.onSubmit?.(), 17);
 
         this.setProgress(0, 0);
         this.setPrompt("");
@@ -151,10 +138,14 @@ export default class KeypadInput extends Konva.Group {
         this.getLayer()?.batchDraw();
     }
 
-    /** Lights `lit` of `total` lock pins and shows "lit/total". */
-    public setProgress(lit: number, total: number): void {
-        const count = Math.max(0, Math.min(MAX_LIGHTS, Math.floor(total)));
-        const on = Math.max(0, Math.min(count, Math.floor(lit)));
+    /**
+     * One light per Step of `par` (the fewest Steps that solve the equation),
+     * lit for each Step solved. The lights never change in number: a longer
+     * way round shows its extra Steps beside them as "+1", "+2"…
+     */
+    public setProgress(solved: number, par: number): void {
+        const count = Math.max(0, Math.min(MAX_LIGHTS, Math.floor(par)));
+        const on = Math.max(0, Math.min(count, Math.floor(solved)));
         this.lights.destroyChildren();
         // The lights share the space between the label and the "lit/total" count.
         const spacing = count > 0 ? Math.min(32, 160 / count) : 0;
@@ -170,8 +161,9 @@ export default class KeypadInput extends Konva.Group {
                 listening: false, name: isOn ? "light-on" : "light-off",
             }));
         }
-        this.progressText.text(total > 0 ? `${Math.min(lit, total)}/${total}` : "");
-        this.progressText.fill(lit > 0 ? STYLE.ledOn : STYLE.wrongText);
+        const extra = Math.max(0, Math.floor(solved) - Math.floor(par));
+        this.progressText.text(par > 0 ? (extra > 0 ? `+${extra}` : `${on}/${par}`) : "");
+        this.progressText.fill(extra > 0 ? STYLE.hazard : solved > 0 ? STYLE.ledOn : STYLE.wrongText);
         this.getLayer()?.batchDraw();
     }
 
@@ -228,7 +220,7 @@ export default class KeypadInput extends Konva.Group {
 
         const button = new Konva.Group({ x, y, name: `key key-${spec.key}` });
         button.add(new Konva.Rect({
-            y: 6, width, height, cornerRadius: 12, fill: STYLE.keyEdge, listening: false,
+            y: 6, width, height, cornerRadius: 12, fill: STYLE.edge, listening: false,
         }));
         const top = new Konva.Group({ name: "key-top" });
         top.add(new Konva.Rect({
@@ -236,7 +228,7 @@ export default class KeypadInput extends Konva.Group {
             fillLinearGradientStartPoint: { x: 0, y: 0 },
             fillLinearGradientEndPoint: { x: 0, y: height },
             fillLinearGradientColorStops: [...faceStops],
-            stroke: STYLE.keyEdge, strokeWidth: 3,
+            stroke: STYLE.edge, strokeWidth: 3,
         }));
         top.add(new Konva.Text({
             width, height, align: "center", verticalAlign: "middle",
@@ -263,7 +255,3 @@ function displayAnswer(answer: string): string {
     return answer.replace(/-/g, "−");
 }
 
-function setCursor(node: Konva.Node, cursor: string): void {
-    const container = node.getStage()?.container();
-    if (container) container.style.cursor = cursor;
-}

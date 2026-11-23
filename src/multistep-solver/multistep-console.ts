@@ -1,5 +1,10 @@
 import Konva from 'konva'
 
+import { INDUSTRIAL } from '../screens/industrial-theme'
+import { setCursor } from '../screens/theme'
+import { KEYPAD_HEIGHT, KEYPAD_WIDTH } from '../text-input/keypad-input'
+import { OPERATION_BUTTONS_HEIGHT, OPERATION_BUTTONS_WIDTH } from './operation-buttons'
+
 /**
  * Where everything sits on the multistep console, from its top-left corner.
  * The console is drawn for this size; BasicMultistepPuzzle places the
@@ -19,29 +24,17 @@ export const CONSOLE = {
 
 export type InstructionTone = 'move' | 'work' | 'done'
 
+/** The dark plate holding "EQUATION LOCK" in the hazard band. */
+const TITLE_PLATE_WIDTH = 452
+
+/** The shared industrial look, plus the instruction strip's colors per tone. */
 const STYLE = {
-  steel: [0, '#9aa3ad', 0.45, '#cfd5db', 0.55, '#b6bdc5', 1, '#7e8792'],
-  edge: '#1b1d22',
-  hazard: '#f5c400',
-  ink: '#1a1a1a',
-  rivet: '#6b7380',
-  display: '#16181c',
-  displayEdge: '#3a3f47',
-  lcd: '#0c1a10',
-  lcdEdge: '#2b2f36',
-  lcdDim: '#3f9e52',
-  socket: '#2a2d33',
-  socketEdge: '#15171a',
-  socketText: '#c9ced4',
-  label: '#2a2d33',
-  ledOn: '#4cff6a',
+  ...INDUSTRIAL,
   tone: {
-    move: { tag: '#f5c400', text: '#ffd447' },
-    work: { tag: '#4cff6a', text: '#5dff7a' },
-    done: { tag: '#4cff6a', text: '#5dff7a' },
+    move: { tag: INDUSTRIAL.hazard, text: '#ffd447' },
+    work: { tag: INDUSTRIAL.ledOn, text: INDUSTRIAL.lcdText },
+    done: { tag: INDUSTRIAL.ledOn, text: INDUSTRIAL.lcdText },
   },
-  title: 'Fredoka, sans-serif',
-  mono: "'Courier New', monospace",
 } as const
 
 /**
@@ -82,11 +75,10 @@ class MultistepConsole extends Konva.Group {
       stroke: STYLE.edge, strokeWidth: 4, listening: false,
     }))
     this.add(hazardBand(width, CONSOLE.band))
-    this.add(new Konva.Rect({
-      x: width / 2 - 226, y: 8, width: 452, height: 48, cornerRadius: 8, fill: STYLE.ink, listening: false,
-    }))
+    const plate = { x: (width - TITLE_PLATE_WIDTH) / 2, y: 8, width: TITLE_PLATE_WIDTH, height: 48 }
+    this.add(new Konva.Rect({ ...plate, cornerRadius: 8, fill: STYLE.ink, listening: false }))
     this.add(new Konva.Text({
-      x: width / 2 - 226, y: 8, width: 452, height: 48, align: 'center', verticalAlign: 'middle',
+      ...plate, align: 'center', verticalAlign: 'middle',
       text: '⚡ EQUATION LOCK ⚡', fontFamily: STYLE.title, fontStyle: 'bold', fontSize: 26,
       letterSpacing: 2, fill: STYLE.hazard, listening: false,
     }))
@@ -132,12 +124,12 @@ class MultistepConsole extends Konva.Group {
     this.slotLabel = label('MOVE A TERM', slot.x + 4, slot.y - 24)
     this.add(this.slotLabel)
     this.add(new Konva.Rect({
-      ...slot, fill: STYLE.socket, stroke: STYLE.socketEdge, strokeWidth: 4, cornerRadius: 14, listening: false,
+      ...slot, fill: STYLE.housing, stroke: STYLE.housingEdge, strokeWidth: 4, cornerRadius: 14, listening: false,
     }))
     this.slotCaption = new Konva.Text({
       x: slot.x + 12, y: CONSOLE.dropZone.y + CONSOLE.dropZone.size / 2 + 12,
       width: slot.width - 24, align: 'center', lineHeight: 1.3,
-      fontFamily: STYLE.title, fontStyle: '600', fontSize: 16, fill: STYLE.socketText,
+      fontFamily: STYLE.title, fontStyle: '600', fontSize: 16, fill: STYLE.housingText,
       listening: false, name: 'slot-caption',
     })
     this.add(this.slotCaption)
@@ -147,7 +139,7 @@ class MultistepConsole extends Konva.Group {
     this.operationsLabel = label('UNDO IT ON BOTH SIDES', ops.x + 4, ops.y - 24)
     this.add(this.operationsLabel)
     this.operationsHint = new Konva.Text({
-      x: ops.x, y: ops.y + 184, width: 510, lineHeight: 1.35,
+      x: ops.x, y: ops.y + OPERATION_BUTTONS_HEIGHT + 22, width: OPERATION_BUTTONS_WIDTH, lineHeight: 1.35,
       fontFamily: STYLE.title, fontStyle: '600', fontSize: 17, fill: STYLE.label,
       listening: false, name: 'operations-hint',
     })
@@ -155,7 +147,7 @@ class MultistepConsole extends Konva.Group {
 
     // Under the keypad.
     this.add(new Konva.Text({
-      x: CONSOLE.keypad.x, y: CONSOLE.keypad.y + 490, width: 364, align: 'center',
+      x: CONSOLE.keypad.x, y: CONSOLE.keypad.y + KEYPAD_HEIGHT + 10, width: KEYPAD_WIDTH, align: 'center',
       text: 'Keyboard works too: type the answer, then Enter.',
       fontFamily: STYLE.title, fontStyle: '600', fontSize: 15, fill: STYLE.label, listening: false,
     }))
@@ -177,7 +169,7 @@ class MultistepConsole extends Konva.Group {
     })
     this.solvedDetail = new Konva.Text({
       x: solvedArea.x, y: solvedArea.y + 124, width: solvedArea.width, align: 'center',
-      fontFamily: STYLE.title, fontStyle: '600', fontSize: 18, fill: STYLE.socketText, listening: false,
+      fontFamily: STYLE.title, fontStyle: '600', fontSize: 18, fill: STYLE.housingText, listening: false,
     })
     this.solvedPanel.add(this.solvedAnswer, this.solvedDetail)
     this.solvedPanel.add(continueButton(solvedArea.x + solvedArea.width / 2 - 150, solvedArea.y + 158, () => this.onContinue?.()))
@@ -259,11 +251,6 @@ function continueButton(x: number, y: number, onClick: () => void): Konva.Group 
   button.on('mouseleave', () => setCursor(button, ''))
   button.on('click tap', onClick)
   return button
-}
-
-function setCursor(node: Konva.Node, cursor: string): void {
-  const container = node.getStage()?.container()
-  if (container) container.style.cursor = cursor
 }
 
 export default MultistepConsole

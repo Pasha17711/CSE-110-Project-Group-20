@@ -59,7 +59,7 @@ a "LOCK PINS" row of lights, a display, and the keys.
 
 - Keys: digits, `x`, `/` (fractions), `−` (toggles the sign), `⌫` (backspace),
   `C` (clear) and a tall `ENTER`.
-- The **LOCK PINS** row has one light per Step; `setProgress(lit, total)` lights them.
+- The **LOCK PINS** row: `setProgress(solved, par)` draws one light per Step of par and lights one per Step solved; Steps beyond par show as "+1", "+2"… without adding lights.
 - The display shows what to work out (`setPrompt("14 + 7 =")`) above the answer
   typed so far (`setAnswer("21")`, or `setAnswer()` for the `?` placeholder).
 - `flashWrong()` shows "TRY AGAIN" in red for a moment; `showResult("x = 7")`
