@@ -109,6 +109,7 @@ describe("AnswerValidator", () => {
             {
                 ...step(playerAnswer, playerAnswer === "10 + 2" ? "12" : "-2", true),
                 stepPrompt: playerAnswer,
+                isMultistepArithmetic: true,
             },
             "main",
             "room_a",
@@ -116,6 +117,21 @@ describe("AnswerValidator", () => {
 
         expect(result).toBe(false);
         expect(types()).toEqual([EventType.Incorrect]);
+    });
+
+    it("does not apply multistep arithmetic validation to other puzzle answers", () => {
+        const result = validator.validateAnswer(
+            question,
+            {
+                ...step("10 + 2", "12", true),
+                stepPrompt: "Wire the equation to its value of x",
+            },
+            "main",
+            "room_a",
+        );
+
+        expect(result).toBe(true);
+        expect(types()).toEqual([EventType.RoomSolved, EventType.Correct]);
     });
 
     it("records every Answer as an AnswerRecord", () => {

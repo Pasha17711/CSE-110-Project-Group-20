@@ -27,10 +27,10 @@ export class AnswerValidator {
      */
     validateAnswer(question: Question, answer: StepAnswer, kind: RoomKind,
         roomId: string, stepNumber?: number): boolean {
-        // Multistep arithmetic answers carry the expression being simplified
-        // in stepPrompt. Use the strict solver evaluator there so a copied
-        // prompt cannot be recorded as correct.
-        const isCorrect = answer.stepPrompt !== undefined
+        // Only the multistep solver's arithmetic answers use the strict
+        // evaluator. Other puzzles also use stepPrompt for display/review
+        // text, so stepPrompt alone is not a sufficient discriminator.
+        const isCorrect = answer.isMultistepArithmetic
             ? acceptableArithmeticAnswer(answer.playerAnswer, answer.stepPrompt, answer.correctAnswer)
             : answer.playerAnswer.trim() === answer.correctAnswer.trim() ||
               equivalentArithmeticExpressions(answer.playerAnswer, answer.correctAnswer);
