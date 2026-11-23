@@ -442,6 +442,27 @@ describe('MultistepSolverController', () => {
       expect(controller.getState()).toBe('Arithmetic')
     })
 
+    it('accepts a simplest-form fraction when dividing both sides by 8', () => {
+      const model = new MultistepSolverModel()
+      const controller = new MultistepSolverController(model, fakeView())
+      const prompts: string[] = []
+      const submissions: Array<[string, string]> = []
+      controller.onArithmeticStep = prompt => prompts.push(prompt)
+      controller.onAnswerSubmit = (_question, playerAnswer, correctAnswer) => {
+        submissions.push([playerAnswer, correctAnswer])
+        if (playerAnswer === correctAnswer) controller.step()
+      }
+
+      controller.setEquation('x * 4 + 3 = x * 8')
+      controller.operation(2, false, true)
+      controller.moveRequest('/')
+
+      expect(prompts).toContain('4 / 8')
+      controller.arithmetic('1/2')
+
+      expect(submissions).toContainEqual(['1/2', '1/2'])
+    })
+
     it('does not accept the unsimplified arithmetic prompt as its own answer', () => {
       const controller = new MultistepSolverController(new MultistepSolverModel(), fakeView())
       controller.setEquation('x + 1 = -9 * -8')
