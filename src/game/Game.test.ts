@@ -44,6 +44,7 @@ class FakeMapScreen implements MapScreen {
   readonly layer = {} as Konva.Layer;
   grid: MapGrid | null = null;
   floors: readonly MapFloor[] = [];
+  activeFloorIndex = 0;
   rooms: readonly Room[] = [];
   solved: string[] = [];
   hud: Hud | null = null;
@@ -62,15 +63,26 @@ class FakeMapScreen implements MapScreen {
   setFloors(
     floors: readonly MapFloor[],
     solvedRoomIds: ReadonlySet<string>,
-    activeFloorIndex: number = 0,
+    activeFloorIndex?: number,
   ): void {
     this.floors = floors;
-    const active = floors[activeFloorIndex] ?? floors[0];
+    if (activeFloorIndex !== undefined) {
+      this.activeFloorIndex = activeFloorIndex;
+    }
+    const active = floors[this.activeFloorIndex] ?? floors[0];
     if (active) {
       this.grid = active.grid;
     }
     this.rooms = floors.flatMap((f) => f.grid.getAllRooms().map((placed) => placed.room));
     this.solved = [...solvedRoomIds];
+  }
+
+  selectFloor(index: number): void {
+    this.activeFloorIndex = index;
+    const active = this.floors[index];
+    if (active) {
+      this.grid = active.grid;
+    }
   }
 
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void {
@@ -595,5 +607,26 @@ describe("Game", () => {
 
   it("rejects an unknown difficulty", () => {
     expect(() => newGame(7 as Difficulty)).toThrow(RangeError);
+  });
+
+  it("preserves the active floor and solved-room state after completing a room on Floor 2", () => {
+    game.start();
+
+    // Clear Floor 1 prerequisites so Floor 2's room_e is unlocked
+    enterAndSolve("room_a");
+    enterAndSolve("room_b");
+    enterAndSolve("room_c");
+
+    // Switch to Floor 2 (index 1) and solve room_e
+    mapScreen.selectFloor(1);
+    expect(mapScreen.activeFloorIndex).toBe(1);
+    expect(mapScreen.grid).toBe(mapScreen.floors[1].grid);
+
+    enterAndSolve("room_e");
+
+    expect(shown[shown.length - 1]).toBe("map");
+    expect(mapScreen.activeFloorIndex).toBe(1);
+    expect(mapScreen.grid).toBe(mapScreen.floors[1].grid);
+    expect(mapScreen.solved).toContain("room_e");
   });
 });

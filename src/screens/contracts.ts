@@ -24,7 +24,7 @@ export interface StartScreen extends Screen {
 export interface MapScreen extends Screen {
   /** Renders floor plan dynamically from the 2D MapGrid and solved room IDs */
   setGrid(grid: MapGrid, solvedRoomIds: ReadonlySet<string>): void;
-  setFloors?(floors: readonly MapFloor[], solvedRoomIds: ReadonlySet<string>, activeFloorIndex?: number): void;
+  setFloors(floors: readonly MapFloor[], solvedRoomIds: ReadonlySet<string>, activeFloorIndex?: number): void;
   /** Format with formatTime / formatMoney from score. */
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void;
   showAccessDenied(payload: AccessDeniedPayload): void;

@@ -90,16 +90,10 @@ export class Game {
   }
 
   start(): void {
-    this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
+    this.mapScreen.setFloors(this.floors, this.map.solvedRooms);
     this.updateHud();
     this.screens.show("map");
     this.notifications.send({ eventType: EventType.GameStart });
-
-    if (this.mapScreen.setFloors) {
-      this.mapScreen.setFloors(this.floors, this.map.solvedRooms);
-    } else {
-      this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
-    }
   }
 
   /** The frozen result of the Heist. Throws if the Heist hasn't ended. */
@@ -165,15 +159,11 @@ export class Game {
       this.updateHud();
       this.screens.show("room");
     } else if (event.screen === "map") {
-      // Update grid to show completed rooms
-      this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
+      // Update floors/grid to show completed rooms
+      this.mapScreen.setFloors(this.floors, this.map.solvedRooms);
       this.screens.show("map");
     }
-    if (this.mapScreen.setFloors) {
-      this.mapScreen.setFloors(this.floors, this.map.solvedRooms);
-    } else {
-      this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
-    }
+
   }
 
   private handleHint(): void {
