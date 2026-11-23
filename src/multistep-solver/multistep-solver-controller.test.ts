@@ -461,6 +461,7 @@ describe('MultistepSolverController', () => {
       controller.arithmetic('1/2')
 
       expect(submissions).toContainEqual(['1/2', '1/2'])
+      expect(model.arithmeticProblems()).not.toContainEqual(['4 / 8', '1/2'])
     })
 
     it('does not accept the unsimplified arithmetic prompt as its own answer', () => {

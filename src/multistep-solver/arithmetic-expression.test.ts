@@ -41,6 +41,14 @@ describe('arithmetic expression canonicalization', () => {
     expect(acceptableArithmeticAnswer('-3/2', '6 / -4', '-3/2')).toBe(true)
   })
 
+  it.each(['1/2', '-1/2'])('accepts a reduced unit-numerator fraction: %s', answer => {
+    expect(acceptableArithmeticAnswer(answer, '4 / 8', answer)).toBe(true)
+  })
+
+  it('still rejects multiplication by an explicit unit factor', () => {
+    expect(acceptableArithmeticAnswer('1 * x', '2 / 2 * x', 'x')).toBe(false)
+  })
+
   it.each(['10 + 2', '-4/2', '4/-2'])('rejects typing the unsimplified numeric prompt: %s', answer => {
     expect(acceptableArithmeticAnswer(answer, answer, answer === '10 + 2' ? '12' : '-2')).toBe(false)
   })

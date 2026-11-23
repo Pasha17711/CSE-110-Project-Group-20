@@ -228,7 +228,7 @@ export const acceptableArithmeticAnswer = (
   if (/^[+-]?\d+(?:\.\d+)?\s*[+*-]\s*[+-]?\d/.test(answer.trim())) return false
 
   // Repeated unary signs and explicit unit factors are not simplest form.
-  if (/[+-]\s*[+-]/.test(answer) || /(?:^|[+\-(])\s*-?1\s*[*/]/.test(answer) || /[*/]\s*1\s*(?:$|[+\-)])/.test(answer)) {
+  if (/[+-]\s*[+-]/.test(answer) || /(?:^|[+\-(])\s*-?1\s*\*/.test(answer) || /[*/]\s*1\s*(?:$|[+\-)])/.test(answer)) {
     return false
   }
 
@@ -254,7 +254,7 @@ function isSimpleAnswer(answer: string): boolean {
   return hasSimplestNumericFraction(text) &&
     !/^[+-]?\d+(?:\.\d+)?\s*[+*-]\s*[+-]?\d/.test(text) &&
     !/[+-]\s*[+-]/.test(text) &&
-    !/(?:^|[+\-(])\s*-?1\s*[*/]/.test(text) &&
+    !/(?:^|[+\-(])\s*-?1\s*\*/.test(text) &&
     !/[*/]\s*1\s*(?:$|[+\-)])/.test(text) &&
     !(/[*]/.test(text) && !/[A-Za-z]/.test(text)) &&
     !(/[+-]/.test(text.replace(/^[+-]\s*/, '')) && /[A-Za-z]/.test(text))
