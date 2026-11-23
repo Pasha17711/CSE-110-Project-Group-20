@@ -332,5 +332,20 @@ describe('MultistepSolverModel', () => {
       ])
       expect(model.getRightSide()).toEqual([numberTerm('41'), '/', numberTerm('4')])
     })
+
+    it('does not keep a variable negative after moving a negative leading coefficient', () => {
+      const model = new MultistepSolverModel()
+      addSide(model,
+        [numberTerm('9', false), '*', variableTerm('x', true)],
+        [numberTerm('144', false)],
+      )
+
+      model.moveLeftTerm(0, true)
+
+      expect(model.getLeftSide()).toEqual([variableTerm('x', true)])
+      expect(model.getRightSide()).toEqual([
+        numberTerm('144', false), '/', numberTerm('9', false),
+      ])
+    })
   })
 })

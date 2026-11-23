@@ -112,7 +112,15 @@ class MultistepSolverModel {
       throw Error('Cannot move the selected coefficient.')
     }
 
+    // Transfer a leading coefficient's sign with the coefficient. Otherwise
+    // `-9 * x` becomes `-x / -9`, representing the negative sign twice.
+    const movesNegativeSign = !value.positive
+
     current.splice(index, 2)
+    if (movesNegativeSign) {
+      const variable = current.find(term => typeof term !== 'string' && !term.constant)
+      if (variable && typeof variable !== 'string') variable.positive = true
+    }
     const operation = this.getOppositeOp('*')
     this.distributeFactor(current, operation, value, true)
     this.distributeFactor(newSide, operation, value, false)
@@ -178,6 +186,14 @@ class MultistepSolverModel {
     if (previous === '*' || previous === '/') {
       const oppositeOp = this.getOppositeOp(previous);
       current.splice(index - 1, 2);
+
+      // When the selected coefficient represents the complete signed
+      // variable term, its sign moves with it. Clear that sign from the
+      // variable left behind, otherwise `-9 * x` can become `-x / -9`.
+      if (isCoefficient && !value.positive) {
+        const variable = current.find(term => typeof term !== 'string' && !term.constant)
+        if (variable && typeof variable !== 'string') variable.positive = true
+      }
 
       const newSideArray = newSide.flatMap((term, i) => {
         if (typeof term === 'string' || newSide[i + 1] === '*' || newSide[i + 1] === '/') return term;
