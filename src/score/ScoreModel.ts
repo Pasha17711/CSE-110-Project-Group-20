@@ -232,8 +232,8 @@ export class ScoreModel {
 
 /**
  * Checks at runtime that a value is a real Difficulty (0, 1 or 2).
- * TypeScript types are erased when data is saved to localStorage or passed in
- * from untyped code, so values read back from there must be checked before use.
+ * TypeScript types are erased when data comes from storage, the network or
+ * untyped code, so values read back from there must be checked before use.
  */
 export function isDifficultyType(value: unknown): value is Difficulty {
   return typeof value === "number" && value in DIFFICULTY_MULTIPLIER;
