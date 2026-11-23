@@ -30,7 +30,7 @@ export class AnswerValidator {
         // Only the multistep solver's arithmetic answers use the strict
         // evaluator. Other puzzles also use stepPrompt for display/review
         // text, so stepPrompt alone is not a sufficient discriminator.
-        const isCorrect = answer.isMultistepArithmetic
+        const isCorrect = answer.isMultistepArithmetic && answer.stepPrompt !== undefined
             ? acceptableArithmeticAnswer(answer.playerAnswer, answer.stepPrompt, answer.correctAnswer)
             : answer.playerAnswer.trim() === answer.correctAnswer.trim() ||
               equivalentArithmeticExpressions(answer.playerAnswer, answer.correctAnswer);
