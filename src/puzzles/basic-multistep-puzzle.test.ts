@@ -85,6 +85,7 @@ vi.mock('../text-input/text-input', () => ({
     hide() { this.shown = false }
     outlineColor() {}
     clear() {}
+    ghostText(text: string) { this.options.ghostText = text }
     destroy() {}
   },
 }))
@@ -183,8 +184,23 @@ describe('BasicMultistepPuzzle arithmetic label', () => {
     expect(label().visible()).toBe(false)
   })
 
-  it('uses ? as the placeholder', () => {
-    expect(fakes.input.options.ghostText).toBe('?')
+  it('shows whole-number guidance for whole-number arithmetic', () => {
+    startArithmetic()
+
+    expect(fakes.input.options.ghostText).toBe('e.g. 12; whole number or decimal')
+  })
+
+  it('shows variable-expression guidance for variable arithmetic', () => {
+    ;(puzzle as any).showArithmeticLabel('x + 3 * x')
+
+    expect(fakes.input.options.ghostText).toBe('e.g. 3*x, 3x, or x*3; decimals accepted')
+  })
+
+  it('shows fraction guidance for fraction arithmetic', () => {
+    // Exercise the arithmetic prompt callback directly to isolate the input hint.
+    ;(puzzle as any).showArithmeticLabel('x + 3/2 * x')
+
+    expect(fakes.input.options.ghostText).toBe('e.g. 3/2*x or 1.5x; simplest fraction, decimals accepted')
   })
 
   it('destroys the label with the puzzle', () => {

@@ -1,6 +1,7 @@
 import Konva from 'konva'
 
 import ActionMenu from '../multistep-solver/action-menu'
+import { acceptableArithmeticAnswer } from '../multistep-solver/arithmetic-expression'
 import MultistepSolverController from '../multistep-solver/multistep-solver-controller'
 import MultistepSolverModel from '../multistep-solver/multistep-solver-model'
 import MultistepSolverView from '../multistep-solver/multistep-solver-view'
@@ -81,7 +82,7 @@ class BasicMultistepPuzzle implements Puzzle {
       height: options.inputHeight ?? 50,
       backgroundColor: '#eeeeee',
       foregroundColor: '#000000',
-      ghostText: '?',
+      ghostText: 'Enter an answer',
       ghostTextColor: '#aaaaaa',
     })
 
@@ -158,8 +159,8 @@ class BasicMultistepPuzzle implements Puzzle {
 
 
 
-    this.view.onTargetDropped = (index, isLeftSide) => {
-      this.controller.operation(index, isLeftSide)
+    this.view.onTargetDropped = (index, isLeftSide, isCoefficient) => {
+      this.controller.operation(index, isLeftSide, isCoefficient)
     }
     this.view.onNegativeSignDropped = isLeftSide => {
       this.controller.removeNegativeSign(isLeftSide)
@@ -190,11 +191,20 @@ class BasicMultistepPuzzle implements Puzzle {
       this.keypadAnswer = ''
       this.keypad.setAnswer()
 
-      if (playerAnswer === correctAnswer) {
+      const accepted = stepPrompt === undefined
+        ? playerAnswer === correctAnswer
+        : acceptableArithmeticAnswer(playerAnswer, stepPrompt, correctAnswer)
+      if (accepted) {
         this.controller.step()
       }
 
-        this.onAnswer?.({ playerAnswer, correctAnswer, isLastStep, stepPrompt })
+        this.onAnswer?.({
+          playerAnswer,
+          correctAnswer,
+          isLastStep,
+          stepPrompt,
+          ...(stepPrompt !== undefined ? { isMultistepArithmetic: true } : {}),
+        })
     }
 
     this.controller.onArithmeticStep = expression => {
@@ -277,6 +287,17 @@ class BasicMultistepPuzzle implements Puzzle {
 
   /** Shows `expression =` right-aligned against the input's left edge. */
   private showArithmeticLabel(expression: string): void {
+    const hasVariable = /[A-Za-z]/.test(expression)
+    const hasFraction = /\//.test(expression)
+    const hint = hasVariable
+      ? hasFraction
+        ? 'e.g. 3/2*x or 1.5x; simplest fraction, decimals accepted'
+        : 'e.g. 3*x, 3x, or x*3; decimals accepted'
+      : hasFraction
+        ? 'e.g. 3/2; simplest fraction, decimals accepted'
+        : 'e.g. 12; whole number or decimal'
+
+    this.textInput.ghostText(hint)
     const inputWidth = this.options.inputWidth ?? 100
     const rightEdge = this.options.x - inputWidth / 2 - BasicMultistepPuzzle.LABEL_GAP
     this.arithmeticLabel.text(`${expression} =`)
