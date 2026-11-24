@@ -159,7 +159,7 @@ class BasicMultistepPuzzle implements Puzzle {
 
     this.keypad.onKeyPressed = key => this.pressKey(key)
     this.keypad.onSubmit = () => this.submitKeypad()
-    this.console.onContinue = () => this.releaseFinalAnswer()
+    this.console.onContinue = () => this.sendPendingAnswer()
 
     this.controller.onAnswerSubmit = (_question, playerAnswer, correctAnswer, isLastStep, stepPrompt) => {
       this.keypadAnswer = ''
@@ -239,7 +239,7 @@ class BasicMultistepPuzzle implements Puzzle {
         this.console.setInstruction('SOLVED', `${display(answer)}. The lock is open.`, 'done')
         this.console.setEquationCaption('')
         this.console.showSolved(display(answer), this.solvedSummary())
-        if (this.finalAnswer) this.finalTimer = setTimeout(() => this.releaseFinalAnswer(), FINAL_ANSWER_MS)
+        if (this.finalAnswer) this.finalTimer = setTimeout(() => this.sendPendingAnswer(), FINAL_ANSWER_MS)
         this.onPuzzleFinished?.(true)
         break
       }
@@ -279,8 +279,12 @@ class BasicMultistepPuzzle implements Puzzle {
     }
   }
 
-  /** Sends the Answer that solves the Room, once. */
-  private releaseFinalAnswer(): void {
+  /**
+   * Sends the Answer that solves the Room, once. Called by "Back to map", by
+   * the FINAL_ANSWER_MS timer, or by the Room's Exit button so leaving while
+   * the answer is shown still counts the solve.
+   */
+  public sendPendingAnswer(): void {
     if (this.finalTimer !== null) clearTimeout(this.finalTimer)
     this.finalTimer = null
     const answer = this.finalAnswer

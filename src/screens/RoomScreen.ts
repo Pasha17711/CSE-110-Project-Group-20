@@ -73,7 +73,12 @@ export class RoomScreen implements RoomScreenContract {
       width: 140, height: 43,
       label: "Exit",
       name: "exit",
-      onClick: () => this.exits.emit(),
+      onClick: () => {
+        // A solved multistep room holds its last Answer while it shows the
+        // answer; send it first so leaving through Exit still counts the solve.
+        this.puzzle?.sendPendingAnswer?.();
+        this.exits.emit();
+      },
     }));
 
     this.feedback = createText({

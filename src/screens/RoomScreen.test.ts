@@ -130,6 +130,18 @@ describe("RoomScreen", () => {
     expect(onExit).toHaveBeenCalledOnce();
   });
 
+  it("Exit sends an Answer the puzzle is still holding before leaving, so a solve is not lost", () => {
+    const events: string[] = [];
+    screen.onAnswer((a) => events.push(`answer ${a.playerAnswer}`));
+    screen.onExit(() => events.push("exit"));
+    screen.setRoom(roomA);
+    created[0].holdAnswer({ playerAnswer: "2", correctAnswer: "2", isLastStep: true });
+
+    screen.layer.findOne(".exit")!.fire("click");
+
+    expect(events).toEqual(["answer 2", "exit"]);
+  });
+
   it("shows Correct! in green for about a second", () => {
     notifications.send({ eventType: EventType.Correct });
     expect(feedback()).toEqual({ visible: true, text: "Correct!" });

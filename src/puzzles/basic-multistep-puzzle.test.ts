@@ -188,6 +188,21 @@ describe('BasicMultistepPuzzle', () => {
     expect(t.answers[3].isLastStep).toBe(true)
   })
 
+  it('sendPendingAnswer (the Room\'s Exit) sends the final Answer at once, and only once', () => {
+    vi.useFakeTimers()
+    const t = setup()
+    t.puzzle.sendPendingAnswer() // nothing held yet
+    expect(t.answers).toHaveLength(0)
+    solve(t)
+
+    t.puzzle.sendPendingAnswer()
+    t.find('back-to-map').fire('click')
+    vi.advanceTimersByTime(FINAL_ANSWER_MS)
+
+    expect(t.answers).toHaveLength(4)
+    expect(t.answers[3]).toMatchObject({ playerAnswer: '7', isLastStep: true })
+  })
+
   it('says when the answer has an x, and takes it typed as -10x', () => {
     // Moving x * 7 leaves x * -3 - x * 7 = 10: the two x terms combine to -x * 10.
     const t = setup('x * -3 = 10 + x * 7')
