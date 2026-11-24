@@ -1,4 +1,4 @@
-import { Term, TermOp, TermValue } from './types'
+import { TermOp, TermValue } from './types'
 import MultistepSolverModel from './multistep-solver-model'
 import MultistepSolverView from './multistep-solver-view'
 import { acceptableArithmeticAnswer } from './arithmetic-expression'
@@ -246,20 +246,17 @@ class MultistepSolverController {
    * The real model is untouched.
    */
   private wouldFinish(change: (scratch: MultistepSolverModel) => void): boolean {
-    const copy = (term: Term): Term => (typeof term === 'string' ? term : { ...term })
-    const scratch = new MultistepSolverModel()
-    this.model.getLeftSide().forEach(term => scratch.addLeft(copy(term)))
-    this.model.getRightSide().forEach(term => scratch.addRight(copy(term)))
+    const scratch = this.model.clone()
     try {
       change(scratch)
     } catch {
       return false
     }
-    return isSolved(scratch.getLeftSide(), scratch.getRightSide())
+    return scratch.isSolved()
   }
 
   private isSolvedEquation(): boolean {
-    return isSolved(this.model.getLeftSide(), this.model.getRightSide())
+    return this.model.isSolved()
   }
 
   private updateStateAfterModelChange(): void {
@@ -279,21 +276,6 @@ class MultistepSolverController {
     this.setState('Arithmetic')
     this.onArithmeticStep?.(problems[0][0])
   }
-}
-
-/** True for `x = n` or `n = x` (a lone positive variable against a lone constant). */
-function isSolved(left: Array<Term>, right: Array<Term>): boolean {
-  const isVariable = (side: Array<Term>): boolean => {
-    if (side.length !== 1) return false
-    const term = side[0]
-    return typeof term !== 'string' && !term.constant && term.positive
-  }
-  const isConstant = (side: Array<Term>): boolean => {
-    if (side.length !== 1) return false
-    const term = side[0]
-    return typeof term !== 'string' && term.constant
-  }
-  return (isVariable(left) && isConstant(right)) || (isConstant(left) && isVariable(right))
 }
 
 export default MultistepSolverController

@@ -1,6 +1,7 @@
 import Konva from "konva";
 import { formatMath } from "../questions/formatMath";
 import { PowerBoxBackdrop } from "./power-box-backdrop";
+import { INDUSTRIAL } from "../screens/industrial-theme";
 
 export interface PowerBoxViewOptions {
   /** Center of the panel, in layer coordinates. */
@@ -49,26 +50,14 @@ export const SPARK_MS = 350;
 /** One animation step. setTimeout (not requestAnimationFrame) so tests can use fake timers. */
 const FRAME_MS = 16;
 
-/** The industrial look: brushed steel, hazard stripes, green LCD screens. */
+/** The industrial look (shared with the multistep room), plus the Power Box's own parts. */
 const STYLE = {
-  steel: [0, "#9aa3ad", 0.45, "#cfd5db", 0.55, "#b6bdc5", 1, "#7e8792"],
-  edge: "#1b1d22",
-  hazard: "#f5c400",
-  ink: "#1a1a1a",
-  rivet: "#6b7380",
-  lcd: "#0c1a10",
-  lcdText: "#5dff7a",
-  lcdWrong: "#3a0c0c",
-  lcdWrongText: "#ff5a5a",
-  jack: "#2a2d33",
+  ...INDUSTRIAL,
+  lcdWrongText: INDUSTRIAL.wrongText,
+  jack: INDUSTRIAL.housing,
   jackHole: "#0d0e10",
-  ledOn: "#4cff6a",
-  ledOff: "#5c1414",
   online: "#ff3b3b",
-  offline: "#4cff6a",
-  display: "#16181c",
-  title: "Fredoka, sans-serif",
-  mono: "'Courier New', monospace",
+  offline: INDUSTRIAL.ledOn,
 } as const;
 
 const BAND_HEIGHT = 64;

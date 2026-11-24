@@ -348,4 +348,36 @@ describe('MultistepSolverModel', () => {
       ])
     })
   })
+
+  describe('removeNegativeSign', () => {
+    it('turns a lone -x = -9 into x = 9', () => {
+      const model = new MultistepSolverModel()
+      addSide(model, [variableTerm('x', false)], [numberTerm('9', false)])
+
+      model.removeNegativeSign(true)
+
+      expect(model.getLeftSide()).toEqual([variableTerm('x', true)])
+      expect(model.getRightSide()).toEqual([numberTerm('9')])
+    })
+
+    it('still turns -x * 3 = 6 into x * 3 = -6', () => {
+      const model = new MultistepSolverModel()
+      addSide(model, [variableTerm('x', false), '*', constantTerm(3)], [constantTerm(6)])
+
+      model.removeNegativeSign(true)
+
+      expect(model.getLeftSide()).toEqual([variableTerm('x', true), '*', constantTerm(3)])
+      expect(model.getRightSide()).toEqual([numberTerm('6', false)])
+    })
+
+    it('refuses a positive x or a side with more than the x term', () => {
+      const positive = new MultistepSolverModel()
+      addSide(positive, [variableTerm('x', true)], [constantTerm(9)])
+      expect(() => positive.removeNegativeSign(true)).toThrow()
+
+      const longer = new MultistepSolverModel()
+      addSide(longer, [variableTerm('x', false), constantTerm(2)], [constantTerm(9)])
+      expect(() => longer.removeNegativeSign(true)).toThrow()
+    })
+  })
 })
