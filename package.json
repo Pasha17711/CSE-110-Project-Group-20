@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/kaiyoig/CSE-110-Project-Group-20#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "konva": "^10.9.0"
   },
   "devDependencies": {

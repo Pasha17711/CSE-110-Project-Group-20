@@ -5,6 +5,7 @@ import MultistepSolverController, { type MultistepSolverState } from '../multist
 import MultistepSolverModel from '../multistep-solver/multistep-solver-model'
 import MultistepSolverView, { type MultistepSolverTheme } from '../multistep-solver/multistep-solver-view'
 import OperationButtons from '../multistep-solver/operation-buttons'
+import { acceptableArithmeticAnswer } from '../multistep-solver/arithmetic-expression'
 import { answerText, display, displayExpression, normalizeKeypadAnswer, keyboardKey } from '../multistep-solver/answer-format'
 import { stepsLeft } from '../multistep-solver/step-counter'
 import type { TermOp } from '../multistep-solver/types'
@@ -153,7 +154,8 @@ class BasicMultistepPuzzle implements Puzzle {
   }
 
   private connectComponents(): void {
-    this.view.onTargetDropped = (index, isLeftSide) => this.controller.operation(index, isLeftSide)
+    this.view.onTargetDropped = (index, isLeftSide, isCoefficient) =>
+      this.controller.operation(index, isLeftSide, isCoefficient)
     this.view.onNegativeSignDropped = isLeftSide => this.controller.removeNegativeSign(isLeftSide)
     this.operations.onPick = op => this.controller.moveRequest(op)
 
@@ -164,9 +166,19 @@ class BasicMultistepPuzzle implements Puzzle {
     this.controller.onAnswerSubmit = (_question, playerAnswer, correctAnswer, isLastStep, stepPrompt) => {
       this.keypadAnswer = ''
       this.keypad.setAnswer()
-      const answer: StepAnswer = { playerAnswer, correctAnswer, isLastStep, stepPrompt }
+      // Arithmetic Steps have a prompt and are checked like the solver does
+      // (7/3, 2.5 and 3x all count when they equal the answer in simplest
+      // form); Operation Steps must pick the exact operation.
+      const isArithmetic = stepPrompt !== undefined
+      const answer: StepAnswer = {
+        playerAnswer, correctAnswer, isLastStep, stepPrompt,
+        ...(isArithmetic ? { isMultistepArithmetic: true } : {}),
+      }
+      const accepted = isArithmetic
+        ? acceptableArithmeticAnswer(playerAnswer, stepPrompt, correctAnswer)
+        : playerAnswer === correctAnswer
 
-      if (playerAnswer !== correctAnswer) {
+      if (!accepted) {
         this.showWrong()
         this.onAnswer?.(answer)
         return
@@ -196,6 +208,9 @@ class BasicMultistepPuzzle implements Puzzle {
         this.console.setOperationsHint('The answer has an x: type the number, then the x key (like 5x or 3/4x).')
       } else {
         this.console.setInstruction(this.stepTag(), `Work out ${shown} on the keypad`, 'work')
+        if (expression.includes('/')) {
+          this.console.setOperationsHint('If it doesn\'t divide evenly, type the simplest fraction, like 7/3.')
+        }
       }
     }
 

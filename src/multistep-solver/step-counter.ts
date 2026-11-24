@@ -52,15 +52,21 @@ export function stepsLeft(model: MultistepSolverModel): number {
   return startArithmetic + 2
 }
 
-/** Every move the player could make: move any value term, or remove a negative sign. */
+/**
+ * Every move the player could make: drag any term the view shows (a
+ * coefficient such as the 3 in 3x moves as a coefficient, like the view's
+ * drag does), or remove a negative sign.
+ */
 function possibleMoves(model: MultistepSolverModel): Array<(scratch: MultistepSolverModel) => void> {
   const moves: Array<(scratch: MultistepSolverModel) => void> = []
-  model.getLeftSide().forEach((term, index) => {
-    if (typeof term !== 'string') moves.push(scratch => scratch.moveLeftTerm(index))
-  })
-  model.getRightSide().forEach((term, index) => {
-    if (typeof term !== 'string') moves.push(scratch => scratch.moveRightTerm(index))
-  })
+  for (const isLeftSide of [true, false]) {
+    for (const { term, modelIndex, isCoefficient } of model.getDisplaySide(isLeftSide)) {
+      if (typeof term === 'string') continue
+      moves.push(scratch => isLeftSide
+        ? scratch.moveLeftTerm(modelIndex, isCoefficient === true)
+        : scratch.moveRightTerm(modelIndex, isCoefficient === true))
+    }
+  }
   moves.push(scratch => scratch.removeNegativeSign(true))
   moves.push(scratch => scratch.removeNegativeSign(false))
   return moves

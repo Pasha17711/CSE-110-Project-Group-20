@@ -15,6 +15,9 @@ export const COLORS = {
   darkGreen: "#02671dff",
   red: "#ff5a5a",
   white: "#ffffff",
+  saveGreen: "#15803d",
+  saveOrange: "#b45309",
+  saveRed: "#b91c1c",
 } as const;
 
 export const BONUS_COLORS = {

@@ -10,6 +10,8 @@ export interface TextInputOptions {
   foregroundColor: string
   ghostText?: string
   ghostTextColor: string
+  /** Most characters the player can type. No limit when left out. */
+  maxLength?: number
 }
 
 /** Combines a styled Konva input rectangle with an internal HTML text input. */
@@ -60,7 +62,9 @@ class TextInput extends Konva.Group {
     this.input.type = 'text'
     this.input.className = this.ghostTextClass
     this.input.placeholder = options.ghostText ?? ''
+    this.input.title = this.input.placeholder
     this.input.autocomplete = 'off'
+    if (options.maxLength !== undefined) this.input.maxLength = options.maxLength
     // Positioning is calculated from getBoundingClientRect(), which uses
     // viewport coordinates. Fixed positioning keeps the HTML overlay in that
     // same coordinate system and prevents document/body offsets from shifting
@@ -101,6 +105,11 @@ class TextInput extends Konva.Group {
     return this.input.value
   }
 
+  /** Replaces the input text. @param text New text. */
+  public setText(text: string): void {
+    this.input.value = text
+  }
+
   /** Clears the input text. */
   public clear(): void {
     this.input.value = ''
@@ -115,6 +124,12 @@ class TextInput extends Konva.Group {
   public ghostTextColor(color: string): void {
     const style = document.getElementById(this.ghostTextClass)
     if (style) style.textContent = `.${this.ghostTextClass}::placeholder { color: ${color}; }`
+  }
+
+  /** Changes the input's placeholder guidance. */
+  public ghostText(text: string): void {
+    this.input.placeholder = text
+    this.input.title = text
   }
 
   /** Changes the Konva background color. @param color New fill color. */

@@ -128,8 +128,10 @@ export class RoomScreen implements RoomScreenContract {
 
     // App-scoped, like the screen itself, so these are never unsubscribed.
     notifications.subscribe(EventType.Correct, () => this.showFeedback("Correct!", COLORS.green));
-    notifications.subscribe(EventType.Incorrect, () =>
-      this.showFeedback(`Incorrect: −${WRONG_ANSWER_PENALTY_SECONDS} s`, COLORS.red));
+    notifications.subscribe(EventType.Incorrect, () => {
+      this.hud.showPenalty();
+      this.showFeedback(`Incorrect!`, COLORS.red)
+    });
   }
 
   /**

@@ -21,11 +21,11 @@ describe('normalizeKeypadAnswer', () => {
     ['-21', '-21'],
     ['3/4', '3/4'],
     ['-3/4', '-3/4'],
-    ['3x', 'x * 3'],
-    ['x3', 'x * 3'],
-    ['-3x', '-x * 3'],
-    ['11/2x', 'x * 11/2'],
-    ['x', 'x * 1'],
+    ['3x', '3x'],
+    ['x3', '3x'],
+    ['-3x', '-3x'],
+    ['11/2x', '11/2x'],
+    ['x', 'x'],
   ])('reads %s as %s', (typed, expected) => {
     expect(normalizeKeypadAnswer(typed as string)).toBe(expected)
   })
@@ -47,6 +47,10 @@ describe('displayExpression', () => {
     ['14 - -3', '14 − −3'],
     ['21 / 3', '21 / 3'],
     ['-3 * 4', '−3 · 4'],
+    // The solver now writes coefficients first.
+    ['5 * x + x / 2', '5x + x/2'],
+    ['-3 * x - 7 * x', '−3x − 7x'],
+    ['5 * x - -2 * x', '5x − (−2)x'],
   ])('shows %s as %s', (expression, shown) => {
     expect(displayExpression(expression as string)).toBe(shown)
   })

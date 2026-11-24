@@ -5,7 +5,7 @@ vi.mock("../text-input/text-input", () => import("./testing/fakeTextInput"));
 
 import type Konva from "konva";
 import { EndScreen } from "./EndScreen";
-import { Difficulty, type LeaderboardEntry, type ScoreSnapshot } from "../score";
+import { Difficulty, type AddEntryResult, type LeaderboardEntry, type LoadResult, type ScoreSnapshot } from "../score";
 import type { HeistResult } from "../game/Game";
 import { visibleTexts } from "./testing/fakeKonva";
 import { created, type FakeTextInput } from "./testing/fakeTextInput";
@@ -43,8 +43,16 @@ function caught(overrides: Partial<ScoreSnapshot> = {}): HeistResult {
   };
 }
 
-function entry(playerName: string, score: number): LeaderboardEntry {
-  return { playerName, difficulty: Difficulty.Medium, score, timeSpentMs: 65_000, date: "2026-11-02T00:00:00.000Z" };
+function entry(playerName: string, score: number, isMine = false): LeaderboardEntry {
+  return { id: playerName, playerName, difficulty: Difficulty.Medium, score, timeSpentMs: 65_000, date: "2026-11-02T00:00:00.000Z", isMine };
+}
+
+function saved(rank: number, isNewBest = true, best = entry("Me", 900, true)): AddEntryResult {
+  return { status: "saved", rank, isNewBest, best };
+}
+
+function loaded(...entries: LeaderboardEntry[]): LoadResult {
+  return { status: "loaded", entries };
 }
 
 describe("EndScreen", () => {
@@ -73,7 +81,7 @@ describe("EndScreen", () => {
   });
 
   it("shows Escaped! and the name box for an Escaped Heist", () => {
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
 
     expect((find("outcome") as Konva.Text).text()).toBe("Escaped!");
     expect(nameBoxShown()).toBe(true);
@@ -83,7 +91,7 @@ describe("EndScreen", () => {
     "keeps save, review and replay controls separate and inside a %i by %i stage",
     (width, height) => {
       screen = new EndScreen(width, height);
-      screen.setResult(escaped(), []);
+      screen.setResult(escaped());
       const save = find("save");
       const review = find("review-answers");
       const replay = find("play-again");
@@ -103,7 +111,7 @@ describe("EndScreen", () => {
   );
 
   it("hides name entry during answer review and restores it when review closes", () => {
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
     find("review-answers").fire("click");
     expect(nameBoxShown()).toBe(false);
     screen.show();
@@ -113,7 +121,7 @@ describe("EndScreen", () => {
   });
 
   it("shows Caught!, score 0 and no name box for a Caught Heist", () => {
-    screen.setResult(caught(), []);
+    screen.setResult(caught());
 
     expect((find("outcome") as Konva.Text).text()).toBe("Caught!");
     expect(stat("score")).toBe("0");
@@ -121,24 +129,24 @@ describe("EndScreen", () => {
   });
 
   it("takes the outcome from result.outcome, not snapshot.caught", () => {
-    screen.setResult({ ...escaped(), outcome: "caught" }, []);
+    screen.setResult({ ...escaped(), outcome: "caught" });
 
     expect((find("outcome") as Konva.Text).text()).toBe("Caught!");
   });
 
   it("shows the Flawless badge only for an Escaped Heist with no incorrect Answers", () => {
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
     expect(find("flawless").visible()).toBe(true);
 
-    screen.setResult(escaped({ incorrectAnswers: 1, flawless: false }), []);
+    screen.setResult(escaped({ incorrectAnswers: 1, flawless: false }));
     expect(find("flawless").visible()).toBe(false);
 
-    screen.setResult(caught({ incorrectAnswers: 0 }), []);
+    screen.setResult(caught({ incorrectAnswers: 0 }));
     expect(find("flawless").visible()).toBe(false);
   });
 
   it("formats the stats, with Bonus Rooms counted inside Rooms solved", () => {
-    screen.setResult(escaped({ score: 1234 }), []);
+    screen.setResult(escaped({ score: 1234 }));
 
     expect(stat("score")).toBe("1,234");
     expect(stat("money")).toBe("$1,200.00");
@@ -154,13 +162,13 @@ describe("EndScreen", () => {
     [Difficulty.Medium, "Medium"],
     [Difficulty.Hard, "Hard"],
   ])("labels Difficulty %s as %s", (difficulty, label) => {
-    screen.setResult(escaped({ difficulty }), []);
+    screen.setResult(escaped({ difficulty }));
 
     expect(stat("difficulty")).toBe(label);
   });
 
   it("keeps zero stats visible", () => {
-    screen.setResult(escaped({ score: 0, money: 0, roomsSolved: 0, bonusRoomsSolved: 0, timeSpentMs: 0 }), []);
+    screen.setResult(escaped({ score: 0, money: 0, roomsSolved: 0, bonusRoomsSolved: 0, timeSpentMs: 0 }));
 
     expect(stat("score")).toBe("0");
     expect(stat("money")).toBe("$0.00");
@@ -169,31 +177,165 @@ describe("EndScreen", () => {
     expect(stat("bonus")).toBe("0");
   });
 
-  it("lists the leaderboard entries it is given, or says there are none", () => {
-    screen.setResult(escaped(), []);
-    expect(visibleTexts(screen.layer)).toContain("No saved scores yet.");
+  describe("leaderboard", () => {
+    function rows(): string[][] {
+      return screen.layer.find(".leaderboard-row").map((row) => visibleTexts(row));
+    }
 
-    screen.setResult(escaped(), [entry("Ana", 900), entry("Bo", 500)]);
-    const texts = visibleTexts(screen.layer);
-    expect(texts).toEqual(expect.arrayContaining(["Leaderboard: Medium", "1.", "Ana", "900", "2.", "Bo", "500"]));
-    expect(texts).not.toContain("No saved scores yet.");
+    function highlighted(): boolean[] {
+      return screen.layer.find(".leaderboard-row").map((row) => (row as Konva.Group).findOne(".mine-highlight") !== undefined);
+    }
+
+    it("shows the board as loading for a new result", () => {
+      screen.setResult(escaped());
+
+      expect(visibleTexts(screen.layer)).toContain("Loading leaderboard…");
+      expect(rows()).toEqual([]);
+    });
+
+    it("lists the entries it is given, or says there are none", () => {
+      screen.setResult(escaped());
+      screen.setLeaderboard(loaded());
+      expect(visibleTexts(screen.layer)).toContain("No saved scores yet.");
+
+      screen.setLeaderboard(loaded(entry("Ana", 900), entry("Bo", 500)));
+      expect(visibleTexts(screen.layer)).toContain("Leaderboard: Medium");
+      expect(rows()).toEqual([["1.", "Ana", "900", "00:01:05"], ["2.", "Bo", "500", "00:01:05"]]);
+      expect(visibleTexts(screen.layer)).not.toContain("No saved scores yet.");
+      expect(visibleTexts(screen.layer)).not.toContain("Loading leaderboard…");
+    });
+
+    it("says so when the board couldn't load", () => {
+      screen.setResult(escaped());
+      screen.setLeaderboard({ status: "loadFailed" });
+
+      expect(visibleTexts(screen.layer)).toContain("Couldn't load the leaderboard.");
+    });
+
+    it("keeps the board when the same result is shown again, and resets it for a new one", () => {
+      const result = escaped();
+      screen.setResult(result);
+      screen.setLeaderboard(loaded(entry("Ana", 900)));
+
+      screen.setResult(result);
+      expect(rows()).toHaveLength(1);
+
+      screen.setResult(escaped());
+      expect(rows()).toEqual([]);
+      expect(visibleTexts(screen.layer)).toContain("Loading leaderboard…");
+    });
+
+    it("highlights the current Player's rows", () => {
+      screen.setResult(escaped());
+      screen.setLeaderboard(loaded(entry("Ana", 900), entry("Me", 800, true), entry("Bo", 500)));
+
+      expect(highlighted()).toEqual([false, true, false]);
+    });
+
+    it("pins a saved Personal Best outside the top 10 in the last row, with its Rank", () => {
+      const top = Array.from({ length: 10 }, (_, i) => entry(`P${i + 1}`, 1000 - i));
+      screen.setResult(escaped());
+      screen.showSaveResult(saved(57, true, entry("Me", 10, true)));
+      screen.setLeaderboard(loaded(...top));
+
+      const shown = rows();
+      expect(shown).toHaveLength(10);
+      expect(shown[8]).toEqual(["9.", "P9", "992", "00:01:05"]);
+      expect(shown[9]).toEqual(["57.", "Me", "10", "00:01:05"]);
+      expect(highlighted()[9]).toBe(true);
+    });
+
+    it("doesn't pin a Personal Best that is already on the board", () => {
+      const me = entry("Me", 950, true);
+      screen.setResult(escaped());
+      screen.showSaveResult(saved(2, true, me));
+      screen.setLeaderboard(loaded(entry("Ana", 1000), me, entry("Bo", 500)));
+
+      expect(rows().map((row) => row[1])).toEqual(["Ana", "Me", "Bo"]);
+    });
+
+    it("drops the pinned row for a new result", () => {
+      screen.setResult(escaped());
+      screen.showSaveResult(saved(57, true, entry("Me", 10, true)));
+
+      screen.setResult(escaped());
+      screen.setLeaderboard(loaded(entry("Ana", 900)));
+
+      expect(rows()).toEqual([["1.", "Ana", "900", "00:01:05"]]);
+    });
   });
 
-  it("entering a name calls onSaveScore; after the next setResult the box is gone and the entry is listed", () => {
-    const result = escaped();
-    const onSaveScore = vi.fn();
-    screen.onSaveScore(onSaveScore);
-    screen.setResult(result, []);
+  describe("saving", () => {
+    function saveButton(): Konva.Group {
+      return find("save") as Konva.Group;
+    }
 
-    input.enter("  Ana  ");
-    expect(onSaveScore).toHaveBeenCalledExactlyOnceWith("Ana");
+    function prompt(): string {
+      return (find("name-prompt") as Konva.Text).text();
+    }
 
-    screen.setResult(result, [entry("Ana", result.snapshot.score)]);
-    expect(nameBoxShown()).toBe(false);
-    expect(visibleTexts(screen.layer)).toContain("Ana");
+    it("caps the name box at the database's name length", () => {
+      expect(input.options.maxLength).toBe(20);
+    });
 
-    input.enter("Ana again");
-    expect(onSaveScore).toHaveBeenCalledOnce();
+    it("entering a name calls onSaveScore once, and greys out Save until the result comes back", () => {
+      const onSaveScore = vi.fn();
+      screen.onSaveScore(onSaveScore);
+      screen.setResult(escaped());
+
+      input.enter("  Ana  ");
+      expect(onSaveScore).toHaveBeenCalledExactlyOnceWith("Ana");
+      expect(nameBoxShown()).toBe(true);
+      expect(saveButton().opacity()).toBe(0.5);
+      expect(saveButton().listening()).toBe(false);
+      expect(visibleTexts(saveButton())).toEqual(["Saving…"]);
+
+      input.enter("Ana again");
+      saveButton().fire("click");
+      expect(onSaveScore).toHaveBeenCalledOnce();
+    });
+
+    it("hides the name box once saved", () => {
+      const onSaveScore = vi.fn();
+      screen.onSaveScore(onSaveScore);
+      screen.setResult(escaped());
+      input.enter("Ana");
+
+      screen.showSaveResult(saved(1));
+
+      expect(nameBoxShown()).toBe(false);
+      input.enter("Ana again");
+      expect(onSaveScore).toHaveBeenCalledOnce();
+    });
+
+    it("offers the name box again with an error after a failed save, and lets the player retry", () => {
+      const onSaveScore = vi.fn();
+      screen.onSaveScore(onSaveScore);
+      screen.setResult(escaped());
+      input.enter("Ana");
+
+      screen.showSaveResult({ status: "saveFailed" });
+
+      expect(nameBoxShown()).toBe(true);
+      expect(prompt()).toBe("Couldn't save your score. Try again.");
+      expect(saveButton().opacity()).toBe(1);
+      expect(visibleTexts(saveButton())).toEqual(["Save"]);
+      expect((find("save-message") as Konva.Text).visible()).toBe(false);
+
+      saveButton().fire("click");
+      expect(onSaveScore).toHaveBeenCalledTimes(2);
+      expect(prompt()).toBe("Enter your name to save your score:");
+    });
+
+    it("fills the name box with the suggested name for each new result", () => {
+      screen.suggestName("Ana");
+      screen.setResult(escaped());
+      expect(input.text()).toBe("Ana");
+
+      input.value = "typed";
+      screen.setResult(escaped());
+      expect(input.text()).toBe("Ana");
+    });
   });
 
   describe("showSaveResult", () => {
@@ -202,43 +344,55 @@ describe("EndScreen", () => {
       return { shown: node.visible(), text: node.text() };
     }
 
-    it("shows the rank when the score made the board", () => {
-      screen.setResult(escaped(), []);
-      screen.showSaveResult({ status: "ranked", rank: 2 });
+    it("shows the Rank of a new Personal Best", () => {
+      screen.setResult(escaped());
+      screen.showSaveResult(saved(2));
 
-      expect(message()).toEqual({ shown: true, text: "Saved! You're #2 on the Medium leaderboard." });
+      expect(message()).toEqual({ shown: true, text: "New Personal Best! You're #2 on the Medium leaderboard." });
     });
 
-    it("says so when the score didn't make the board", () => {
-      screen.setResult(escaped(), []);
-      screen.showSaveResult({ status: "notRanked" });
+    it("says the Personal Best still stands when the run was worse", () => {
+      screen.setResult(escaped());
+      screen.showSaveResult(saved(3, false));
 
-      expect(message()).toEqual({ shown: true, text: "Not on the Medium leaderboard this time. Try again!" });
+      expect(message()).toEqual({ shown: true, text: "Saved. Your Personal Best is still #3 on Medium." });
     });
 
-    it("says so when saving failed", () => {
-      screen.setResult(escaped(), []);
-      screen.showSaveResult({ status: "saveFailed" });
+    it("adds a nudge when the Rank is outside the top 10", () => {
+      screen.setResult(escaped());
+      screen.showSaveResult(saved(10));
+      expect(message().text).toBe("New Personal Best! You're #10 on the Medium leaderboard.");
 
-      expect(message().shown).toBe(true);
-      expect(message().text).toContain("Couldn't save your score");
+      screen.showSaveResult(saved(11));
+      expect(message().text).toBe("New Personal Best! You're #11 on the Medium leaderboard. Top 10 next time!");
+
+      screen.showSaveResult(saved(42, false));
+      expect(message().text).toBe("Saved. Your Personal Best is still #42 on Medium. Top 10 next time!");
     });
 
-    it("keeps the message when the same result is shown again (the leaderboard refresh)", () => {
+    it("says so when the score saved but the Rank couldn't load", () => {
+      screen.setResult(escaped());
+      screen.showSaveResult({ status: "savedUnranked" });
+
+      expect(message()).toEqual({ shown: true, text: "Saved! Couldn't load the leaderboard to show your rank." });
+    });
+
+    it("keeps the message when the board refreshes or the same result is shown again", () => {
       const result = escaped();
-      screen.setResult(result, []);
-      screen.showSaveResult({ status: "ranked", rank: 1 });
+      screen.setResult(result);
+      screen.showSaveResult(saved(1));
 
-      screen.setResult(result, [entry("Ana", result.snapshot.score)]);
+      screen.setLeaderboard(loaded(entry("Ana", result.snapshot.score)));
+      screen.setResult(result);
 
       expect(message().shown).toBe(true);
     });
 
     it("clears the message for a new result", () => {
-      screen.setResult(escaped(), []);
-      screen.showSaveResult({ status: "ranked", rank: 1 });
+      screen.setResult(escaped());
+      screen.showSaveResult(saved(1));
 
-      screen.setResult(escaped(), []);
+      screen.setResult(escaped());
 
       expect(message().shown).toBe(false);
     });
@@ -247,7 +401,7 @@ describe("EndScreen", () => {
   it("the Save button saves the typed name", () => {
     const onSaveScore = vi.fn();
     screen.onSaveScore(onSaveScore);
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
 
     input.value = "Bo";
     find("save").fire("click");
@@ -258,7 +412,7 @@ describe("EndScreen", () => {
   it("ignores an empty name", () => {
     const onSaveScore = vi.fn();
     screen.onSaveScore(onSaveScore);
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
 
     input.enter("   ");
 
@@ -268,16 +422,16 @@ describe("EndScreen", () => {
 
   it("offers the name box again for a new result", () => {
     screen.onSaveScore(() => {});
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
     input.enter("Ana");
 
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
 
     expect(nameBoxShown()).toBe(true);
   });
 
   it("hides the name box's input while the screen is hidden", () => {
-    screen.setResult(escaped(), []);
+    screen.setResult(escaped());
 
     screen.hide();
     expect(input.visible()).toBe(false);
@@ -329,13 +483,13 @@ describe("EndScreen", () => {
     }
 
     function openReview(history: AnswerRecord[] = []): void {
-        screen.setResult({ ...escaped(), history }, []);
+        screen.setResult({ ...escaped(), history });
         find("review-answers").fire("click");
     }
 
     //Test 1: Modal should stay hidden until clicked
     it("starts hidden and opens when Review Answers is clicked", () => {
-        screen.setResult(escaped(), []);
+        screen.setResult(escaped());
 
         expect(find("review-modal").visible()).toBe(false);
 
@@ -587,7 +741,7 @@ it("resets the review when a new game result arrives", () => {
     screen.setResult({
         ...escaped(),
         history: [answer(q3, "6", true)]
-    }, []);
+    });
 
     expect(find("review-modal").visible()).toBe(false);
 

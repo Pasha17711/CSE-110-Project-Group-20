@@ -2,14 +2,17 @@ import Konva from "konva";
 import { NotificationManager } from "./notification-manager/NotificationManager";
 import { AudioManager } from "./audio/AudioManager";
 import { EventType } from "./notification-manager/GameEvent";
-import { Leaderboard, type Difficulty } from "./score";
+import { Leaderboard, UnavailableLeaderboardStore, type Difficulty } from "./score";
+import { getSupabase } from "./score/supabaseClient";
+import { SupabaseLeaderboardStore } from "./score/SupabaseLeaderboardStore";
 import { ScreenController } from "./screens/ScreenController";
 import { StartScreen } from "./screens/StartScreen";
 import { MapScreen } from "./screens/MapScreen";
 import { RoomScreen } from "./screens/RoomScreen";
 import { EndScreen } from "./screens/EndScreen";
 import { CreditsScreen } from "./screens/CreditsScreen";
-import { Game, type HeistResult } from "./game/Game";
+import { Game } from "./game/Game";
+import { connectEndScreenLeaderboard } from "./endScreenLeaderboard";
 
 /**
  * The only place that creates app-scoped objects and connects the Heist
@@ -31,7 +34,10 @@ const stage = new Konva.Stage({
 const notifications = new NotificationManager();
 // One app-scoped subscriber; all sounds react to the same events as the score/HUD.
 const audio = new AudioManager(notifications);
-const leaderboard = new Leaderboard();
+// Online only. Without the Supabase env vars, boards fail to load and saves fail.
+const supabase = getSupabase();
+if (!supabase) console.warn("VITE_SUPABASE_URL / VITE_SUPABASE_KEY not set: the leaderboard is offline.");
+const leaderboard = new Leaderboard(supabase ? new SupabaseLeaderboardStore(supabase) : new UnavailableLeaderboardStore());
 const screens = new ScreenController(stage);
 
 const startScreen = new StartScreen(stage.width(), stage.height(), leaderboard);
@@ -54,11 +60,12 @@ document.fonts.addEventListener("loadingdone", () => {
 });
 
 let game: Game | null = null;
-let lastResult: HeistResult | null = null;
-let scoreSaved = false;
+let lastDifficulty: Difficulty | null = null;
+const endLeaderboard = connectEndScreenLeaderboard(endScreen, leaderboard);
 
 function startHeist(difficulty: Difficulty): void {
   game?.dispose();
+  lastDifficulty = difficulty;
   game = new Game(difficulty, { notifications, screens, mapScreen, roomScreen });
   game.start();
 }
@@ -73,23 +80,12 @@ notifications.subscribe(EventType.GameOver, () => {
   const result = game.getResult();
   game.dispose();
   game = null;
-  lastResult = result;
-  scoreSaved = false;
-  endScreen.setResult(result, leaderboard.getEntries(result.snapshot.difficulty));
+  endLeaderboard.showResult(result);
   screens.show("end");
 });
 
-endScreen.onSaveScore((playerName) => {
-  if (!lastResult || lastResult.outcome !== "escaped" || scoreSaved) return;
-  scoreSaved = true;
-  const { difficulty, score, timeSpentMs } = lastResult.snapshot;
-  const saveResult = leaderboard.addEntry({ playerName, difficulty, score, timeSpentMs });
-  endScreen.setResult(lastResult, leaderboard.getEntries(difficulty));
-  endScreen.showSaveResult(saveResult);
-});
-
 endScreen.onPlayAgain(() => {
-  if (lastResult) startHeist(lastResult.snapshot.difficulty);
+  if (lastDifficulty !== null) startHeist(lastDifficulty);
 });
 
 endScreen.onBackToStart(() => {

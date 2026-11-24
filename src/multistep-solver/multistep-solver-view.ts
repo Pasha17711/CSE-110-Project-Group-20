@@ -1,7 +1,7 @@
 import Konva from 'konva'
 
-import { Term } from './types'
-import MultistepSolverModel from './multistep-solver-model'
+import { Term, TermValue } from './types'
+import MultistepSolverModel, { DisplayTerm as ModelDisplayTerm } from './multistep-solver-model'
 
 type Block = Konva.Group
 type BlockRole = 'value' | 'variable' | 'operator' | 'equals'
@@ -9,6 +9,7 @@ type BlockRole = 'value' | 'variable' | 'operator' | 'equals'
 interface DisplayTerm {
   term: Term
   modelIndex: number
+  isCoefficient?: boolean
   negativeSign?: boolean
   displayText?: string
 }
@@ -90,7 +91,7 @@ class MultistepSolverView {
   private readonly dropZoneCenter?: { x: number, y: number }
   private readonly DROP_ZONE_SIZE: number
 
-  public onTargetDropped?: (index: number, left: boolean) => void
+  public onTargetDropped?: (index: number, left: boolean, isCoefficient: boolean) => void
   public onNegativeSignDropped?: (left: boolean) => void
 
   private rectIntersectsRect(a: Konva.IRect, b: Konva.IRect): boolean {
@@ -165,7 +166,7 @@ class MultistepSolverView {
           this.centerInDropzone(clone);
           this.dropZoneText.visible(false);
 
-          this.onTargetDropped?.(index, isLeftSide);
+          this.onTargetDropped?.(index, isLeftSide, block.getAttr('isCoefficient') === true);
         } else {
           clone.destroy();
         }
@@ -306,6 +307,7 @@ class MultistepSolverView {
 
     group.setAttr('term', term);
     group.setAttr('modelIndex', displayTerm.modelIndex);
+    group.setAttr('isCoefficient', displayTerm.isCoefficient === true);
     if (displayTerm.negativeSign) {
       group.setAttr('negativeSign', true);
       this.makePaletteBlock(group);
@@ -336,6 +338,7 @@ class MultistepSolverView {
     const isNegativeSign = displayTerm.negativeSign === true;
     const isOperator = typeof term === 'string';
     block.setAttr('modelIndex', displayTerm.modelIndex);
+    block.setAttr('isCoefficient', displayTerm.isCoefficient === true);
     block.setAttr('negativeSign', isNegativeSign);
 
     const shouldBePalette = isNegativeSign || !isOperator;
@@ -350,8 +353,9 @@ class MultistepSolverView {
     this.styleBlock(block, this.textOf(displayTerm), this.roleOf(displayTerm));
   }
 
-  private getDisplayTerms(terms: Array<Term>): Array<DisplayTerm> {
+  private getDisplayTerms(displaySide: Array<ModelDisplayTerm>): Array<DisplayTerm> {
     let displayTerms: Array<DisplayTerm> = [];
+    const terms = displaySide.map(({ term }) => term);
     const hasLeadingMinusOperator = terms[0] === '-';
     const variableIndex = hasLeadingMinusOperator ? 1 : 0;
     const multiplicationIndex = variableIndex + 1;
@@ -371,31 +375,33 @@ class MultistepSolverView {
     for (let i = 0; i < terms.length; ++i) {
       let term = terms.at(i);
       if (!term) continue;
+      const modelDisplayTerm = displaySide[i]
 
       const isZero = typeof term !== 'string' && term.constant && term.term.split('/')[0] === '0';
       if (i === 0 && hasLeadingMinusOperator && canRemoveNegativeSign) {
         displayTerms.push({
           term: '-',
-          modelIndex: variableIndex,
+          modelIndex: displaySide[variableIndex].modelIndex,
           negativeSign: true,
         });
         continue;
       }
       if (i === 0 && hasLeadingMinusOperator) {
-        displayTerms.push({ term, modelIndex: i });
+        displayTerms.push({ term, modelIndex: displaySide[i].modelIndex });
         continue;
       }
-      if (i === 0 && typeof term !== 'string' && !term.positive && !isZero) {
+      if (i === 0 && typeof term !== 'string' && !term.positive && !isZero &&
+        !(term.constant && terms[i + 1] === '*')) {
         displayTerms.push({
           term: '-',
-          modelIndex: i,
+          modelIndex: displaySide[i].modelIndex,
           negativeSign: canRemoveNegativeSign,
         });
       }
       if (i > 0 && typeof term !== 'string' && typeof terms[i - 1] !== 'string') {
         displayTerms.push({
           term: term.positive ? '+' : '-',
-          modelIndex: i,
+          modelIndex: displaySide[i].modelIndex,
         });
       }
       const isNegativeFactor = i > 0 &&
@@ -405,16 +411,22 @@ class MultistepSolverView {
         term.constant;
       displayTerms.push({
         term,
-        modelIndex: i,
-        displayText: isNegativeFactor ? `(-${term.term})` : undefined,
+        modelIndex: displaySide[i].modelIndex,
+        isCoefficient: displaySide[i].isCoefficient,
+        displayText: modelDisplayTerm.displayText ?? (isNegativeFactor
+          ? `(-${term.term})`
+          : (i === 0 && typeof term !== 'string' && !term.positive && term.constant && terms[i + 1] === '*')
+            ? `-${term.term}`
+            : undefined),
       });
     }
 
     return displayTerms;
   }
 
-  private updateSide(side: Array<Block>, terms: Array<Term>) {
-    let displayTerms = this.getDisplayTerms(terms);
+  private updateSide(side: Array<Block>, displaySide: Array<ModelDisplayTerm>) {
+    let displayTerms = this.getDisplayTerms(displaySide);
+    // console.debug(displaySide, displayTerms)
 
     if (displayTerms.length < side.length) {
       let extraBlocks = side.splice(displayTerms.length);
@@ -578,8 +590,8 @@ class MultistepSolverView {
       return;
     }
 
-    this.updateSide(this.leftSide, leftSide);
-    this.updateSide(this.rightSide, rightSide);
+    this.updateSide(this.leftSide, model.getDisplaySide(true));
+    this.updateSide(this.rightSide, model.getDisplaySide(false));
 
     this.layoutEquation();
 

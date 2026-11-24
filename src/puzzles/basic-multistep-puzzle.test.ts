@@ -213,7 +213,7 @@ describe('BasicMultistepPuzzle', () => {
     expect(t.find('step-message').text()).toBe('Combine the x terms: −3x − 7x')
 
     t.press('-', '1', '0', 'x', 'Enter')
-    expect(t.answers[1]).toMatchObject({ playerAnswer: '-x * 10', correctAnswer: '-x * 10' })
+    expect(t.answers[1]).toMatchObject({ playerAnswer: '-10x', correctAnswer: '-10 * x', isMultistepArithmetic: true })
   })
 
   it('solves -x = -9 in one Step: drop the minus sign and multiply', () => {
@@ -250,6 +250,27 @@ describe('BasicMultistepPuzzle', () => {
     expect(t.find('keypad-progress').text()).toBe('+1')
     expect(t.find('solved-answer').text()).toBe('x = 7')
     expect(visibleTexts(t.layer)).toContain('Solved in 5 steps (par 4)')
+  })
+
+  it('checks arithmetic the way the solver does: simplest form only', () => {
+    const t = setup()
+    // Moving the 3 first leaves -7 / 3 to work out.
+    t.internals.controller.operation(2, true)
+    t.find('operation-/').fire('click')
+    expect(t.find('operations-hint').text()).toContain('simplest fraction')
+
+    t.press('-', '1', '4', '/', '6', 'Enter')
+    expect(t.answers[1]).toMatchObject({ playerAnswer: '-14/6', isMultistepArithmetic: true })
+    expect(t.lit()).toBe(1)
+
+    t.press('-', '7', '/', '3', 'Enter')
+    expect(t.lit()).toBe(2)
+  })
+
+  it('operation Steps are not marked as arithmetic', () => {
+    const t = setup()
+    moveMinusSeven(t)
+    expect(t.answers[0].isMultistepArithmetic).toBeUndefined()
   })
 
   it('solving on par says so', () => {
