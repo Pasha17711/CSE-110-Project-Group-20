@@ -185,4 +185,81 @@ describe("RoomScreen", () => {
 
     random.mockRestore();
   });
+
+
+  it("positions feedback below the panel for Laser Matching in any room", () => {
+    const questions = [
+      { prompt: "y = x", answer: "y = 1 * x + 0" }
+    ];
+
+    //use Room A to verify it doesn't depend on Room C
+    const laserRoom = new Room({
+      id: "room_a_laser",
+      name: "Room A",
+      question,
+      puzzle: { type: "laser", questions },
+    });
+
+    screen.setRoom(laserRoom);
+
+    const feedbackNode = screen.layer.findOne<Konva.Text>(".feedback")!;
+
+    notifications.send({ eventType: EventType.Incorrect });
+
+    expect(feedbackNode.text()).toBe("Incorrect!");
+    expect(feedbackNode.y()).toBe(799);
+
+    notifications.send({ eventType: EventType.Correct });
+
+    expect(feedbackNode.text()).toBe("Correct!");
+    expect(feedbackNode.y()).toBe(799);
+  });
+
+
+  it("restores the original feedback position for other puzzle types", () => {
+    const questions = [
+      { prompt: "y = x", answer: "y = 1 * x + 0" }
+    ];
+
+    const laserRoom = new Room({
+      id: "laser_room",
+      name: "Room A",
+      question,
+      puzzle: { type: "laser", questions },
+    });
+
+    const powerBoxRoom = new Room({
+      id: "power_room",
+      name: "Room B",
+      question,
+      puzzle: {
+        type: "powerBox",
+        pairs: [{ question }],
+      },
+    });
+
+    const feedbackNode = screen.layer.findOne<Konva.Text>(".feedback")!;
+
+    //laser Mmtching uses the lower position
+    screen.setRoom(laserRoom);
+    notifications.send({ eventType: EventType.Correct });
+    expect(feedbackNode.y()).toBe(799);
+
+    //power box returns to the original position
+    screen.setRoom(powerBoxRoom);
+    notifications.send({ eventType: EventType.Correct });
+    expect(feedbackNode.y()).toBe(734);
+
+    //multistep returns to the original position
+    screen.setRoom(roomA);
+    notifications.send({ eventType: EventType.Incorrect });
+    expect(feedbackNode.y()).toBe(734);
+
+    // switching back to laser matching restores its position
+    screen.setRoom(laserRoom);
+    notifications.send({ eventType: EventType.Correct });
+    expect(feedbackNode.y()).toBe(799);
+  });
+
+
 });

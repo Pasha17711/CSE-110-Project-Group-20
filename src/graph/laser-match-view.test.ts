@@ -446,6 +446,33 @@ describe('LaserMatchView', () => {
     view.destroy();
   });
 
+  it('resets hovered cards to normal size after matching', () => {
+    const { view, root, graphs } = setup();
+
+    const equationCard = findEquationCard(root, 'y = x + 1');
+    const graphCard = findGraphCard(graphs[0]);
+
+    // simulate hovering over both cards
+    equationCard.fire('mouseenter');
+    graphCard.fire('mouseenter');
+
+    // cards should grow on hover
+    expect(equationCard.getAttr('scaleX')).toBe(1.03);
+    expect(graphCard.getAttr('scaleX')).toBe(1.03);
+
+    // complete a correct match
+    equationCard.fire('click');
+    graphCard.fire('click');
+    view.solve(E1);
+
+    // both cards should return to normal size
+    expect(equationCard.getAttr('scaleX')).toBe(1);
+    expect(equationCard.getAttr('scaleY')).toBe(1);
+    expect(graphCard.getAttr('scaleX')).toBe(1);
+    expect(graphCard.getAttr('scaleY')).toBe(1);
+
+    view.destroy();
+  });
 
 
 
