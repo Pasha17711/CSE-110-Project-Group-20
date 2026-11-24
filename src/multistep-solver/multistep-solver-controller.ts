@@ -107,8 +107,9 @@ class MultistepSolverController {
   public moveRequest(operation: TermOp): void {
     if (this.state !== 'Operation' || !this.pendingOperation) return
 
+    // Multiplication and division by -1 is equivalent
     const expectedOperation = this.pendingOperation.kind === 'negativeSign'
-      ? '*'
+      ? (operation === '/' ? '/' : '*')
       : this.model.correctOperation(
         this.pendingOperation.index!,
         this.pendingOperation.isLeftSide,
