@@ -664,9 +664,20 @@ class LaserMatchView {
       shadowOpacity: 0,
     });
 
-    // dim the completed cards
-    equationRow.card.to({ opacity: 0.6, duration: 0.3 });
-    graphRow.card.to({ opacity: 0.6, duration: 0.3 });
+    // dim the completed cards and reset card size
+    equationRow.card.to({
+      opacity: 0.6,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 0.3,
+    });
+
+    graphRow.card.to({
+      opacity: 0.6,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 0.3,
+    });
 
     // select next security laser to disable
     const indicatorIndex =
