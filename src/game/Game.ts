@@ -12,7 +12,7 @@ import type { AnswerRecord } from "../validation/AnswerHistory";
 import { AnswerValidator } from "../validation/AnswerValidator";
 import type { ScreenController } from "../screens/ScreenController";
 import type { MapScreen, RoomScreen, Unsubscribe } from "../screens/contracts";
-import { MapLayout } from "../map/MapLayout";
+import { MapFloor, MapLayout } from "../map/MapLayout";
 
 export type HeistOutcome = "escaped" | "caught";
 
@@ -46,6 +46,7 @@ export class Game {
 
   private readonly score: ScoreController;
   private readonly rooms: Room[];
+  private readonly floors: MapFloor[];
   private readonly map: MapController;
   private readonly history = new AnswerHistory();
   private readonly hintsByRoom = new Map<string, number>();
@@ -80,6 +81,7 @@ export class Game {
     // Generates map layout based on difficulty
     const layout = MapLayout.createLayout(difficulty);
     this.rooms = layout.rooms;
+    this.floors = layout.floors;
     this.map = new MapController(this.notifications, layout.grid);
     this.rooms.forEach((room) => this.map.registerRoom(room));
     this.validator = new AnswerValidator(this.history, this.notifications);
@@ -88,7 +90,7 @@ export class Game {
   }
 
   start(): void {
-    this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
+    this.mapScreen.setFloors(this.floors, this.map.solvedRooms);
     this.updateHud();
     this.screens.show("map");
     this.notifications.send({ eventType: EventType.GameStart });
@@ -157,10 +159,11 @@ export class Game {
       this.updateHud();
       this.screens.show("room");
     } else if (event.screen === "map") {
-      // Update grid to show completed rooms
-      this.mapScreen.setGrid(this.map.grid, this.map.solvedRooms);
+      // Update floors/grid to show completed rooms
+      this.mapScreen.setFloors(this.floors, this.map.solvedRooms);
       this.screens.show("map");
     }
+
   }
 
   private handleHint(): void {
