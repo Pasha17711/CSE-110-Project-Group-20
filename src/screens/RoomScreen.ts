@@ -43,6 +43,7 @@ export class RoomScreen implements RoomScreenContract {
   private readonly hintModal = new Konva.Group({ visible: false, name: "hint-modal" });
   private readonly hintMessage: Konva.Text;
   private feedbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private originalFeedbackY?: number;
 
   constructor(stageWidth: number, stageHeight: number, notifications: NotificationManager) {
     fitLayer(this.layer, stageWidth, stageHeight);
@@ -255,6 +256,20 @@ export class RoomScreen implements RoomScreenContract {
 
   private showFeedback(text: string, color: string): void {
     this.clearFeedback();
+
+    // save the original position
+    if (this.originalFeedbackY === undefined) {
+      this.originalFeedbackY = this.feedback.y();
+    }
+
+  
+    // only change feedback positioning for graph matching puzzles
+    const isLaserMatching = this.activeRoom?.puzzle.type === 'laser';
+    
+    this.feedback.y(
+      this.originalFeedbackY + (isLaserMatching ? 65 : 0)
+    );
+
     this.feedback.text(text);
     this.feedback.fill(color);
     this.feedback.visible(true);
