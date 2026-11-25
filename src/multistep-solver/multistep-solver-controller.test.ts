@@ -279,9 +279,8 @@ describe('MultistepSolverController', () => {
   })
 
   describe('isLastStep', () => {
-    const solveWithSubmissions = (equation: string) => {
+    const solveWithSubmissions = (equation: string, model = new MultistepSolverModel()) => {
       const submissions: Array<[string, string, boolean]> = []
-      const model = new MultistepSolverModel()
       const controller = new MultistepSolverController(model, fakeView())
       controller.onAnswerSubmit = (_q, playerAnswer, correctAnswer, isLastStep) => {
         submissions.push([playerAnswer, correctAnswer, isLastStep])
@@ -329,6 +328,29 @@ describe('MultistepSolverController', () => {
 
       expect(submissions).toEqual([['*', '*', false]])
       expect(controller.getState()).not.toBe('Finished')
+    })
+
+    it.each(['*', '/'] as const)('accepts %s for removing a negative sign', operation => {
+      const model = new MultistepSolverModel()
+      const { controller, submissions } = solveWithSubmissions('7 = -x', model)
+
+      controller.removeNegativeSign(false)
+      controller.moveRequest(operation)
+
+      expect(submissions).toEqual([[operation, operation, true]])
+      expect(model.getLeftSide()).toEqual([numberTerm('7', false)])
+      expect(model.getRightSide()).toEqual([variableTerm('x', true)])
+      expect(controller.getState()).toBe('Finished')
+    })
+
+    it.each(['+', '-'] as const)('rejects %s for removing a negative sign', operation => {
+      const { controller, submissions } = solveWithSubmissions('7 = -x')
+
+      controller.removeNegativeSign(false)
+      controller.moveRequest(operation)
+
+      expect(submissions).toEqual([[operation, '*', true]])
+      expect(controller.getState()).toBe('Operation')
     })
 
     it('does not change the real equation while checking', () => {
