@@ -72,6 +72,11 @@ function startHeist(difficulty: Difficulty): void {
 
 startScreen.onStart((difficulty) => startHeist(difficulty));
 startScreen.onAudioMuteChange((muted) => audio.setMuted(muted));
+startScreen.onMusicVolumeChange((value) => audio.setMusicVolume(value));
+startScreen.onSfxVolumeChange((value) => audio.setSfxVolume(value));
+// Browser playback needs a real gesture. Subsequent calls are idempotent.
+stage.on("pointerdown", () => audio.startMusic());
+window.addEventListener("keydown", () => audio.startMusic());
 startScreen.onCredits(() => screens.show("credits"));
 creditsScreen.onBack(() => screens.show("start"));
 

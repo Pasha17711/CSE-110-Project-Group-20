@@ -17,6 +17,35 @@ function flush(): Promise<void> {
 }
 
 describe("StartScreen", () => {
+  it("adjusts music and SFX independently and keeps them when reopening settings", () => {
+    const screen = new StartScreen(1440, 900);
+    const music = vi.fn();
+    const sfx = vi.fn();
+    const mute = vi.fn();
+    screen.onMusicVolumeChange(music);
+    screen.onSfxVolumeChange(sfx);
+    screen.onAudioMuteChange(mute);
+    click(screen, "settings-button");
+    const musicThumb = screen.layer.findOne<Konva.Circle>(".music-volume-thumb")!;
+    const sfxThumb = screen.layer.findOne<Konva.Circle>(".sfx-volume-thumb")!;
+    musicThumb.x(340);
+    musicThumb.fire("dragmove");
+    expect(music).toHaveBeenLastCalledWith(0.5);
+    expect(sfx).not.toHaveBeenCalled();
+    sfxThumb.x(170);
+    sfxThumb.fire("dragmove");
+    expect(sfx).toHaveBeenLastCalledWith(0.25);
+    click(screen, "audio-mute-toggle");
+    expect(mute).toHaveBeenLastCalledWith(true);
+    click(screen, "settings-back");
+    screen.show();
+    click(screen, "settings-button");
+    expect(screen.layer.findOne<Konva.Text>(".music-volume-value")!.text()).toBe("50%");
+    expect(screen.layer.findOne<Konva.Text>(".sfx-volume-value")!.text()).toBe("25%");
+    click(screen, "audio-mute-toggle");
+    expect(mute).toHaveBeenLastCalledWith(false);
+  });
+
   it("shows the primary menu buttons initially and reveals difficulties when PLAY is clicked", () => {
     const screen = new StartScreen(1440, 900);
 
