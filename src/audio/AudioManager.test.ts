@@ -13,7 +13,7 @@ describe("AudioManager", () => {
     for (const eventType of [EventType.Correct, EventType.Incorrect, EventType.GameOver] as const) {
       expect(() => manager.send({ eventType })).not.toThrow();
     }
-    expect(() => manager.send({ eventType: EventType.RoomSolved, roomKind: "main" })).not.toThrow();
+    expect(() => manager.send({ eventType: EventType.RoomSolved, roomKind: "main", roomId: "room_a" })).not.toThrow();
     expect(() => manager.send({ eventType: EventType.HintUsed, roomId: "room_a" })).not.toThrow();
     audio.dispose();
   });
