@@ -550,21 +550,23 @@ export class StartScreen implements StartScreenContract {
       width: DESIGN_WIDTH, height: DESIGN_HEIGHT, fill: COLORS.background,
     }));
     this.audioSettings.add(new Konva.Rect({
-      x: 206, y: 136, width: 987, height: 627,
+      x: 206, y: 156, width: 987, height: 607,
       fill: COLORS.room, cornerRadius: 18, name: "settings-panel",
     }));
     this.audioSettings.add(createText({
-      x: 300, y: 60, width: 840, text: "SETTINGS",
+      x: 300, y: 40, width: 840, text: "SETTINGS", name: "settings-heading",
       fontFamily: "Gasoek One", fontStyle: "normal", fontSize: 80,
       align: "center", fill: COLORS.gold, listening: false,
     }));
     this.buildVolumeSlider("Music", "music-volume", 240, DEFAULT_MUSIC_VOLUME, (v) => this.musicVolumeChanges.emit(v));
     this.buildVolumeSlider("Sound Effects", "sfx-volume", 390, DEFAULT_SFX_VOLUME, (v) => this.sfxVolumeChanges.emit(v));
     const muteToggle = new Konva.Group({ x: 245, y: 560, name: "audio-mute-toggle" });
-    muteToggle.add(new Konva.Rect({
+    const muteFace = new Konva.Rect({
       width: 550, height: 90, cornerRadius: 24,
       fill: COLORS.green, stroke: COLORS.purple, strokeWidth: 4,
-    }));
+      name: "audio-mute-face",
+    });
+    muteToggle.add(muteFace);
     this.muteLabel = createText({
       width: 550, height: 90, text: "Mute all: OFF", name: "audio-mute-label",
       align: "center", verticalAlign: "middle", fontSize: 40,
@@ -576,6 +578,7 @@ export class StartScreen implements StartScreenContract {
     muteToggle.on("click tap", () => {
       this.muted = !this.muted;
       this.muteLabel?.text(this.muted ? "Mute all: ON" : "Mute all: OFF");
+      muteFace.fill(this.muted ? COLORS.red : COLORS.green);
       this.muteChanges.emit(this.muted);
       this.layer.batchDraw();
     });

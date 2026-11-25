@@ -6,6 +6,7 @@ import type Konva from "konva";
 import { StartScreen } from "./StartScreen";
 import { Difficulty, Leaderboard, MemoryLeaderboardStore, formatTime } from "../score";
 import { visibleTexts } from "./testing/fakeKonva";
+import { COLORS } from "./theme";
 
 function click(screen: StartScreen, name: string): void {
   screen.layer.findOne(`.${name}`)!.fire("click");
@@ -17,6 +18,34 @@ function flush(): Promise<void> {
 }
 
 describe("StartScreen", () => {
+  it("separates the settings heading from the panel", () => {
+    const screen = new StartScreen(1440, 900);
+    click(screen, "settings-button");
+    const heading = screen.layer.findOne<Konva.Text>(".settings-heading")!;
+    const panel = screen.layer.findOne<Konva.Rect>(".settings-panel")!;
+    expect(panel.y() - (heading.y() + heading.fontSize())).toBeGreaterThanOrEqual(24);
+  });
+
+  it("uses red for muted and green for unmuted, including after reopening settings", () => {
+    const screen = new StartScreen(1440, 900);
+    click(screen, "settings-button");
+    const face = screen.layer.findOne<Konva.Rect>(".audio-mute-face")!;
+    const label = screen.layer.findOne<Konva.Text>(".audio-mute-label")!;
+    expect(face.fill()).toBe(COLORS.green);
+    expect(label.text()).toBe("Mute all: OFF");
+    click(screen, "audio-mute-toggle");
+    expect(face.fill()).toBe(COLORS.red);
+    expect(label.text()).toBe("Mute all: ON");
+    click(screen, "settings-back");
+    screen.show();
+    click(screen, "settings-button");
+    expect(face.fill()).toBe(COLORS.red);
+    expect(label.text()).toBe("Mute all: ON");
+    click(screen, "audio-mute-toggle");
+    expect(face.fill()).toBe(COLORS.green);
+    expect(label.text()).toBe("Mute all: OFF");
+  });
+
   it("adjusts music and SFX independently and keeps them when reopening settings", () => {
     const screen = new StartScreen(1440, 900);
     const music = vi.fn();
