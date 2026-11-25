@@ -68,6 +68,11 @@ const JACK_RADIUS = 20;
 /** Equations are long ("x · -17 - 20 = 302"), answers are short. */
 const LEFT_LABEL_RATIO = 0.42;
 const RIGHT_LABEL_RATIO = 0.18;
+/** Largest LCD font, and the room left for the text inside a screen's border. */
+const MAX_LABEL_FONT = 28;
+const LABEL_PADDING = 16;
+/** Courier New glyphs are 0.6em wide, so a label's width follows from its length. */
+const MONO_CHAR_WIDTH = 0.6;
 
 /**
  * Draws the power box: equations on green LCD screens on the left, answers on
@@ -164,11 +169,15 @@ export class PowerBoxView implements PowerBoxViewLike {
     const rightLabelX = width - 40 - rightWidth;
     const rightJackX = rightLabelX - JACK_RADIUS - 18;
     const screenHeight = this.screenHeight(equations.length);
+    const leftTexts = equations.map(formatMath);
+    const rightTexts = answers.map(formatMath);
+    const leftFont = this.labelFontSize(leftTexts, leftWidth, screenHeight);
+    const rightFont = this.labelFontSize(rightTexts, rightWidth, screenHeight);
 
-    equations.forEach((equation, left) => {
+    leftTexts.forEach((equation, left) => {
       const y = this.rowY(left, equations.length);
       const group = new Konva.Group({ name: `left-${left}` });
-      group.add(this.screen(40, y, leftWidth, screenHeight, formatMath(equation)).group);
+      group.add(this.screen(40, y, leftWidth, screenHeight, equation, leftFont).group);
       const jack = this.jack(group, leftJackX, y, WIRE_COLORS[left % WIRE_COLORS.length]);
       const ring = new Konva.Circle({
         x: leftJackX, y, radius: JACK_RADIUS + 5,
@@ -186,10 +195,10 @@ export class PowerBoxView implements PowerBoxViewLike {
       this.rows.add(group);
     });
 
-    answers.forEach((answer, right) => {
+    rightTexts.forEach((answer, right) => {
       const y = this.rowY(right, answers.length);
       const group = new Konva.Group({ name: `right-${right}` });
-      const screen = this.screen(rightLabelX, y, rightWidth, screenHeight, formatMath(answer));
+      const screen = this.screen(rightLabelX, y, rightWidth, screenHeight, answer, rightFont);
       group.add(screen.group);
       const jack = this.jack(group, rightJackX, y, STYLE.jackHole);
       const hover = new Konva.Circle({
@@ -346,8 +355,18 @@ export class PowerBoxView implements PowerBoxViewLike {
     return Math.min(60, space - 10);
   }
 
-  /** A green LCD screen showing `text`, centered vertically on `centerY`. */
-  private screen(x: number, centerY: number, width: number, height: number, text: string) {
+  /**
+   * One font size for a column of screens: as large as the screens allow,
+   * but small enough that the longest text stays on one line.
+   */
+  private labelFontSize(texts: readonly string[], width: number, height: number): number {
+    const longest = Math.max(1, ...texts.map((text) => text.length));
+    const fitsWidth = (width - LABEL_PADDING) / (longest * MONO_CHAR_WIDTH);
+    return Math.min(MAX_LABEL_FONT, height * 0.5, fitsWidth);
+  }
+
+  /** A green LCD screen showing `text` on one line, centered vertically on `centerY`. */
+  private screen(x: number, centerY: number, width: number, height: number, text: string, fontSize: number) {
     const group = new Konva.Group({ x, y: centerY - height / 2 });
     const box = new Konva.Rect({
       width, height,
@@ -360,7 +379,8 @@ export class PowerBoxView implements PowerBoxViewLike {
       align: "center",
       verticalAlign: "middle",
       fontFamily: STYLE.mono,
-      fontSize: Math.min(28, height * 0.5),
+      fontSize,
+      wrap: "none",
       fontStyle: "bold",
       fill: STYLE.lcdText,
       shadowColor: STYLE.lcdText,
