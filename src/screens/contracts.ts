@@ -34,16 +34,18 @@ export interface MapScreen extends Screen {
 export interface RoomScreen extends Screen {
   /**
    * Builds a fresh puzzle of the Room's kind (`room.puzzle`), so the Room
-   * restarts from Step 1. Restores hints already used; never changes the Room.
+   * restarts from Step 1; never changes the Room.
    */
-  setRoom(room: Room, usedHints?: number): void;
+  setRoom(room: Room): void;
   /** Format with formatTime / formatMoney from score. */
   setHud(timeRemainingMs: number, timeLimitMs: number, money: number): void;
   /** One call per Step's Answer, operation picks included. */
   onAnswer(cb: (answer: StepAnswer) => void): Unsubscribe;
   onExit(cb: () => void): Unsubscribe;
-  /** Optional for fake screens and older screen implementations. */
-  onHint?(cb: () => void): Unsubscribe;
+  /** Requests a hint from the game, which owns the score state. */
+  onHint(cb: () => void): Unsubscribe;
+  /** Displays the granted hint, or null when the room's limit is reached. */
+  showHint(hintNumber: number | null): void;
 }
 
 export interface EndScreen extends Screen {

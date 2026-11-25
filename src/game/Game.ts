@@ -2,7 +2,6 @@ import { NotificationManager } from "../notification-manager/NotificationManager
 import { EventType } from "../notification-manager/GameEvent";
 import { solvesRoom, type Question, type StepAnswer } from "../questions/Question";
 import { ScoreController, ScoreModel } from "../score";
-import { MAX_HINTS_PER_ROOM } from "../score/ScoreModel";
 import type { Difficulty, ScoreSnapshot } from "../score";
 import { MapController } from "../map/MapController";
 import type { SwitchMapScreen } from "../map/MapController";
@@ -49,7 +48,6 @@ export class Game {
   private readonly floors: MapFloor[];
   private readonly map: MapController;
   private readonly history = new AnswerHistory();
-  private readonly hintsByRoom = new Map<string, number>();
   private readonly validator: AnswerValidator;
 
   /** Unsubscribers for everything Game registered on longer-lived objects. */
@@ -121,7 +119,7 @@ export class Game {
         if (!this.ended) this.map.returnToMap(); // map sends ReturnedToMap → clock pauses
       }),
       this.roomScreen.onAnswer((answer) => this.handleAnswer(answer)),
-      ...(this.roomScreen.onHint ? [this.roomScreen.onHint(() => this.handleHint())] : []),
+      this.roomScreen.onHint(() => this.handleHint()),
     );
 
     // Map → screens.
@@ -155,7 +153,7 @@ export class Game {
     if (this.ended) return;
     if (event.room) {
       this.stepNumbers.clear();
-      this.roomScreen.setRoom(event.room, this.hintsByRoom.get(event.room.id) ?? 0);
+      this.roomScreen.setRoom(event.room);
       this.updateHud();
       this.screens.show("room");
     } else if (event.screen === "map") {
@@ -169,10 +167,13 @@ export class Game {
   private handleHint(): void {
     const room = this.map.activeRoom;
     if (this.ended || !room) return;
-    const used = this.hintsByRoom.get(room.id) ?? 0;
-    if (used >= MAX_HINTS_PER_ROOM) return;
-    this.hintsByRoom.set(room.id, used + 1);
+    const model = this.score.getModel();
+    if (!model.canUseHint(room.id)) {
+      this.roomScreen.showHint(null);
+      return;
+    }
     this.notifications.send({ eventType: EventType.HintUsed, roomId: room.id });
+    this.roomScreen.showHint(model.getHintsUsed(room.id));
   }
 
   private handleAnswer(answer: StepAnswer): void {

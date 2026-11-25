@@ -9,7 +9,6 @@ import type { NotificationManager } from "../notification-manager/NotificationMa
 import { EventType } from "../notification-manager/GameEvent";
 import type { StepAnswer } from "../questions/Question";
 import { WRONG_ANSWER_PENALTY_SECONDS } from "../score";
-import { MAX_HINTS_PER_ROOM } from "../score/ScoreModel";
 import type { RoomScreen as RoomScreenContract, Unsubscribe } from "./contracts";
 import { Hud } from "./Hud";
 import { DESIGN_HEIGHT, DESIGN_WIDTH, fitLayer } from "./layout";
@@ -41,7 +40,6 @@ export class RoomScreen implements RoomScreenContract {
   private readonly feedback: Konva.Text;
   private puzzle: Puzzle | null = null;
   private activeRoom: Room | null = null;
-  private usedHints = 0;
   private readonly hintModal = new Konva.Group({ visible: false, name: "hint-modal" });
   private readonly hintMessage: Konva.Text;
   private feedbackTimer: ReturnType<typeof setTimeout> | null = null;
@@ -138,7 +136,7 @@ export class RoomScreen implements RoomScreenContract {
    * Shows the Room and builds a fresh puzzle of the Room's kind, replacing
    * any previous one, so the Room restarts from Step 1.
    */
-  setRoom(room: Room, usedHints: number = 0): void {
+  setRoom(room: Room): void {
     this.destroyPuzzle();
     this.clearFeedback();
     this.roomName.text(room.name);
@@ -148,7 +146,6 @@ export class RoomScreen implements RoomScreenContract {
       : PUZZLE.y + PUZZLE.height / 2 + 24;
     this.feedback.y(bottom);
     this.activeRoom = room;
-    this.usedHints = Math.max(0, Math.min(MAX_HINTS_PER_ROOM, usedHints));
     this.hintModal.hide();
 
     const puzzle = this.buildPuzzle(room);
@@ -176,13 +173,14 @@ export class RoomScreen implements RoomScreenContract {
 
   private requestHint(): void {
     if (!this.activeRoom || this.hintModal.visible()) return;
-    if (this.usedHints >= MAX_HINTS_PER_ROOM) {
-      this.hintMessage.text("You have used both hints for this room. Keep trying!");
-    } else {
-      this.usedHints += 1;
-      this.hints.emit();
-      this.hintMessage.text(this.generateHint(this.activeRoom, this.usedHints));
-    }
+    this.hints.emit();
+  }
+
+  showHint(hintNumber: number | null): void {
+    if (!this.activeRoom || this.hintModal.visible()) return;
+    this.hintMessage.text(hintNumber === null
+      ? "You have used both hints for this room. Keep trying!"
+      : this.generateHint(this.activeRoom, hintNumber));
     this.puzzle?.setInteractionEnabled?.(false);
     this.hintModal.show();
     this.hintModal.moveToTop();

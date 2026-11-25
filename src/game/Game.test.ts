@@ -118,7 +118,7 @@ class FakeRoomScreen implements RoomScreen {
   question: Question | null = null;
   roomName = "";
   setRoomCalls = 0;
-  usedHints = 0;
+  lastHint: number | null = null;
   hud: Hud | null = null;
   readonly answer = new Slot<[StepAnswer]>();
   readonly exit = new Slot<[]>();
@@ -127,9 +127,9 @@ class FakeRoomScreen implements RoomScreen {
   show(): void {}
   hide(): void {}
 
-  setRoom(room: Room, usedHints = 0): void {
+  setRoom(room: Room): void {
     this.room = room;
-    this.usedHints = usedHints;
+    this.lastHint = null;
     this.question = room.question;
     this.roomName = room.name;
     this.setRoomCalls += 1;
@@ -156,6 +156,9 @@ class FakeRoomScreen implements RoomScreen {
   }
   onHint(cb: () => void): Unsubscribe {
     return this.hint.set(cb);
+  }
+  showHint(hintNumber: number | null): void {
+    this.lastHint = hintNumber;
   }
   useHint(): void {
     this.hint.fire();
@@ -378,9 +381,10 @@ describe("Game", () => {
     roomScreen.useHint();
     roomScreen.leave();
     mapScreen.click("room_a");
-    expect(roomScreen.usedHints).toBe(1);
     roomScreen.useHint();
+    expect(roomScreen.lastHint).toBe(2);
     roomScreen.useHint(); // More than two hints cannot be charged.
+    expect(roomScreen.lastHint).toBeNull();
     roomScreen.submit(lastStep(mapScreen.room("room_a").question));
     expect(mapScreen.hud?.money).toBe(50);
     expect(count(EventType.HintUsed)).toBe(2);
